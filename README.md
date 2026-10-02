@@ -5,7 +5,7 @@ Each model is an independent plugin, normally a small JSON manifest. Shared PyTo
 and ONNX Runtime backends handle architecture loading and inference. Weights are fetched
 from the model's recorded sources only when needed, verified, and cached for later use.
 
-**Version:** 0.2.0. Distribution name: `rastermoves`. See [release setup](docs/RELEASING.md)
+**Version:** 0.2.1. Distribution name: `rastermoves`. See [release setup](docs/RELEASING.md)
 for PyPI, TestPyPI, GitHub Releases and container publishing.
 It is an independent implementation, not an official OpenModelDB product.
 
@@ -92,6 +92,35 @@ failures, not presented as successful results. Each model's licence still applie
 Use a new output folder, `--resume`, or `--overwrite` explicitly. Standard tile,
 precision, device, final-size, format, alpha, offline and checksum options also apply.
 See [all-model comparisons](docs/ALL_MODELS.md) for details and resume boundaries.
+
+## Timing and resource traces
+
+```bash
+python -m pip install -e ".[trace]"  # Also included in .[all] and .[dev]
+
+# A single image: output.png.trace.json (a new numbered file if it already exists).
+rastermoves upscale input.png -o output.png --trace
+
+# One timeline for an entire model comparison, with per-model metrics in summary.json.
+rastermoves upscale input.png --all-models -o comparison --trace
+
+# Named trace; --trace-file enables recording even without --trace.
+rastermoves upscale input.png -o output.png --trace-file timings/run-01.json --trace-interval 0.1
+```
+
+Traces contain wall time, process CPU time/utilization, resident/virtual memory and
+thread counts, plus system available-memory context. Timed stages distinguish model
+loading, downloads/cache verification, inference, postprocessing and output writing.
+Open the **Chrome JSON** trace in [Perfetto](https://ui.perfetto.dev/) to inspect the
+stage timeline alongside resource counters, or read the JSON directly. A concise
+run summary is printed to stderr. Batch/all-model defaults are `OUTPUT_DIR/trace.json`.
+
+This is **process-level sampling**, not GPU profiling or exact allocation tracking:
+100% CPU means one logical CPU, multi-core use can exceed 100%, and memory peaks are
+sampled estimates that include runtime/allocator memory. Tracing is off by default;
+no sampler, trace files or psutil import are used until enabled. See the
+[tracing guide](docs/PROFILING.md) for fields, limitations, failure handling, resume and
+Python API usage.
 
 ## First upscale
 

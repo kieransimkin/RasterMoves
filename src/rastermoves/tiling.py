@@ -6,6 +6,7 @@ import math
 import numpy as np
 
 from .errors import BackendOOM, UpscaleError
+from .tracing import event, span, traced
 
 log = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ def _once(image, model, tile, overlap, pad, progress):
     return accumulator
 
 
+@traced("inference")
 def upscale_array(image: np.ndarray, model, *, tile=256, overlap=32, pad=16,
                   max_output_pixels=64_000_000, force_tiling=False, progress=None) -> np.ndarray:
     if any(type(v) is not int or v < 0 for v in (tile, overlap, pad)):
@@ -100,7 +102,8 @@ def upscale_array(image: np.ndarray, model, *, tile=256, overlap=32, pad=16,
         tile = 0
     while True:
         try:
-            return _once(image, model, tile, overlap, pad, progress)
+            with span("inference_attempt", tile=tile, overlap=overlap, tile_pad=pad):
+                return _once(image, model, tile, overlap, pad, progress)
         except BackendOOM:
             # Leave the exception scope before retrying so failed tensor/array frames are released.
             if (model.tiling != "supported" and not force_tiling) or (tile and tile <= 16):
@@ -110,4 +113,5 @@ def upscale_array(image: np.ndarray, model, *, tile=256, overlap=32, pad=16,
         tile = min(256, max(16, math.ceil(max(image.shape[:2]) / 2))) if tile == 0 else max(16, tile // 2)
         overlap = min(overlap, tile // 4)
         pad = min(pad, tile // 4)
+        event("oom_retry", tile=tile, overlap=overlap, tile_pad=pad)
         log.warning("Device memory exhausted; restarting with tile=%d, overlap=%d, pad=%d.", tile, overlap, pad)

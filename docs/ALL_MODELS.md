@@ -41,7 +41,7 @@ rastermoves upscale input.png --all-models --sync-models --dry-run -o comparison
 
 Dry-run emits JSON with IDs, licences, native scales, proposed output paths and declared
 resource sizes. It **does not download weights, load models or create the results
-folder**. `--sync-models` still fetches catalogue metadata; omit it for a fully local
+folder** unless `--trace` is enabled (then only the trace folder/file is created). `--sync-models` still fetches catalogue metadata; omit it for a fully local
 plan. Listed sizes describe resources, not a prediction of total disk usage: mirrors,
 backend choices, cached files and runtime allocations differ. A catalogue-wide run can
 require substantial bandwidth, disk space and processing. Review licence metadata.
@@ -125,3 +125,24 @@ upgrades or changes inside third-party Python plugin code are not fully fingerpr
 use a fresh folder for controlled benchmarks after such changes. A successful result's
 provenance describes the runtime actually used. Hard termination during output writing
 may leave a temporary file; a resumed run does not mistake that file for a verified result.
+
+
+## Resource profiling
+
+Add `--trace` to create `comparison/trace.json`, or choose a different location using
+`--trace-file traces/comparison.json`. Adjust `--trace-interval` in seconds (default
+0.25, allowed 0.05–60). These options do not change the comparison fingerprint.
+
+With tracing, `summary.json` has a `trace_file` reference. Every attempted model row
+has a `performance` object with inclusive wall/CPU time, mean CPU percentage, sampled
+RSS/VMS/thread peaks and sampling-completeness status. Failed attempts also receive
+metrics. These are process-wide absolute memory levels, not model-only allocations.
+The trace contains the detailed nested stages. Reused results get a `model_reused`
+marker and **no new inference metrics**; old elapsed-time fields remain historical.
+
+Each resumed traced invocation creates a new numbered trace by default, leaving the
+old trace intact. An explicit `--trace-file` must be a new path. Image `--overwrite`
+does not grant permission to replace traces. You can toggle tracing when resuming
+with the same software version, input and processing settings. As before, upgrading
+from 0.2.0 to 0.2.1 changes the version fingerprint: use a new folder or `--overwrite`.
+See [PROFILING.md](PROFILING.md) for interpretation and measurement limits.

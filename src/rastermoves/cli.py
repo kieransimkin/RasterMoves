@@ -14,6 +14,7 @@ from .errors import UpscaleError
 from .paths import cache_dir
 from .pipeline import DEFAULT_MODEL, SUPPORTED_IMAGES, Upscaler
 from .registry import Registry
+from .tracing import TraceRecorder, current_trace, span
 
 
 def parser():
@@ -73,6 +74,9 @@ def parser():
     up.add_argument("--overwrite", action="store_true")
     up.add_argument("--continue-on-error", action="store_true", help="Process remaining batch files; still exit nonzero on failures.")
     up.add_argument("--report", action="store_true", help="Write a JSON provenance sidecar next to each output.")
+    up.add_argument("--trace", action="store_true", help="Record stage timing and process CPU/memory to a Chrome JSON trace.")
+    up.add_argument("--trace-file", type=Path, help="Explicit trace .json path (also enables tracing); never overwritten.")
+    up.add_argument("--trace-interval", type=float, help="Resource sampling interval in seconds (default 0.25; range 0.05-60).")
     up.add_argument("--offline", action="store_true")
     up.add_argument("--strict-checksums", action="store_true")
     up.add_argument("--extra-arches", action="store_true", help="Opt in to installed extra architectures with additional licences.")
@@ -85,7 +89,7 @@ def _registry(args):
 
 def _doctor():
     data = {"rastermoves": __version__, "python": sys.version.split()[0], "packages": {}}
-    for package in ("torch", "torchvision", "spandrel", "safetensors", "onnxruntime", "onnxruntime-gpu", "gdown", "huggingface-hub"):
+    for package in ("torch", "torchvision", "spandrel", "safetensors", "onnxruntime", "onnxruntime-gpu", "gdown", "huggingface-hub", "psutil"):
         try:
             data["packages"][package] = version(package)
         except PackageNotFoundError:
@@ -149,9 +153,17 @@ def _all_models(args) -> int:
         if offline:
             raise UpscaleError("--sync-models requires network access; omit it to use the cached catalogue offline.")
         print("Refreshing OpenModelDB metadata (no weights yet)...", file=sys.stderr)
-        sync_catalog(cache_dir(args.cache_dir))
-    registry = _registry(args)
-    specs = registry.search()
+        with span("catalog_sync"):
+            sync_catalog(cache_dir(args.cache_dir))
+    with span("catalog_search"):
+        registry = _registry(args)
+        specs = registry.search()
+    trace = current_trace()
+    if trace:
+        trace.protect_paths([args.output / "summary.json", *[
+            path for spec in specs for path in (
+                args.output / output_name(spec, args.format),
+                args.output / (output_name(spec, args.format) + ".json"))]])
     print(f"Selected {len(specs)} model plugins. Weights download as needed; the full catalogue can use substantial disk space.", file=sys.stderr)
     if args.dry_run:
         print(json.dumps({"dry_run": True, "input": str(args.input), "output_directory": str(args.output),
@@ -222,25 +234,89 @@ def run(args) -> int:
             raise UpscaleError("--sync-models, --dry-run and --resume require --all-models.")
         jobs = batch_jobs(args.input, args.output, recursive=args.recursive, format=args.format)
         failures = 0
-        with Upscaler(args.model, model_file=args.model_file, native_scale=args.native_scale, cache_dir=args.cache_dir,
-                      device=args.device, backend=args.backend, precision=args.precision,
-                      offline=args.offline, strict_checksums=args.strict_checksums, extra_arches=args.extra_arches,
-                      model_dirs=args.plugin_dir, external_plugins=args.external_plugins) as up:
-            for index, (source, output) in enumerate(jobs, 1):
-                print(f"[{index}/{len(jobs)}] {source} -> {output}", file=sys.stderr)
-                try:
-                    up.upscale_file(source, output, overwrite=args.overwrite, report=args.report,
-                                    tile=args.tile, overlap=args.overlap, tile_pad=args.tile_pad,
-                                    scale=args.scale, width=args.width, height=args.height, long_edge=args.long_edge,
-                                    alpha=args.alpha, max_output_mp=args.max_output_mp, force_tiling=args.force_tiling)
-                    print(output)
-                except (UpscaleError, OSError, ValueError) as e:
-                    if not args.continue_on_error:
-                        raise
-                    failures += 1
-                    print(f"ERROR: {source}: {e}", file=sys.stderr)
+        with span("model") as measured:
+            with Upscaler(args.model, model_file=args.model_file, native_scale=args.native_scale, cache_dir=args.cache_dir,
+                          device=args.device, backend=args.backend, precision=args.precision,
+                          offline=args.offline, strict_checksums=args.strict_checksums, extra_arches=args.extra_arches,
+                          model_dirs=args.plugin_dir, external_plugins=args.external_plugins) as up:
+                if measured is not None:
+                    measured.attributes["model_id"] = up.spec.id
+                for index, (source, output) in enumerate(jobs, 1):
+                    print(f"[{index}/{len(jobs)}] {source} -> {output}", file=sys.stderr)
+                    try:
+                        with span("image", input_name=source.name, output_name=output.name):
+                            up.upscale_file(source, output, overwrite=args.overwrite, report=args.report,
+                                            tile=args.tile, overlap=args.overlap, tile_pad=args.tile_pad,
+                                            scale=args.scale, width=args.width, height=args.height, long_edge=args.long_edge,
+                                            alpha=args.alpha, max_output_mp=args.max_output_mp, force_tiling=args.force_tiling)
+                        print(output)
+                    except (UpscaleError, OSError, ValueError) as e:
+                        if not args.continue_on_error:
+                            raise
+                        failures += 1
+                        print(f"ERROR: {source}: {e}", file=sys.stderr)
+            if measured is not None and failures:
+                measured.status = "completed_with_errors"
         return 1 if failures else 0
     return 0
+
+
+def _run_with_trace(args) -> int:
+    enabled = args.command == "upscale" and (args.trace or args.trace_file is not None)
+    if not enabled:
+        if args.command == "upscale" and args.trace_interval is not None:
+            raise UpscaleError("--trace-interval requires --trace or --trace-file.")
+        return run(args)
+    protected = [args.input, args.model_file]
+    if args.all_models:
+        if args.output is None:
+            raise UpscaleError("--all-models requires -o/--output with a named output folder.")
+        if not args.input.is_file():
+            raise UpscaleError("--all-models requires one input image file, not a directory.")
+        default = args.output / "trace.json"
+        protected.append(args.output / "summary.json")
+    else:
+        jobs = batch_jobs(args.input, args.output, recursive=args.recursive, format=args.format)
+        for source, output in jobs:
+            protected.extend((source, output, output.with_suffix(output.suffix + ".json")))
+        if args.input.is_file():
+            default = jobs[0][1].with_suffix(jobs[0][1].suffix + ".trace.json")
+        else:
+            default = (args.output or args.input.with_name(args.input.name + "_upscaled")) / "trace.json"
+    options = {key: getattr(args, key) for key in (
+        "backend", "device", "precision", "tile", "overlap", "tile_pad", "all_models", "dry_run", "resume")}
+    recorder = TraceRecorder(args.trace_file or default,
+                             interval=args.trace_interval if args.trace_interval is not None else 0.25,
+                             auto_suffix=args.trace_file is None, metadata=options)
+    recorder.protect_paths(protected)
+    # Reserve all sweep result names, including models found by --sync-models
+    # later in the traced command. Reject before creating a conflicting trace.
+    if (args.all_models and recorder.path.parent.resolve() == args.output.resolve()
+            and recorder.path.name.startswith("model-")):
+        raise UpscaleError("Trace path overlaps reserved comparison output names; choose another --trace-file.")
+    try:
+        with recorder:
+            print(f"Recording resource trace: {recorder.path}", file=sys.stderr)
+            with span("command", command="upscale") as measured:
+                try:
+                    result = run(args)
+                except KeyboardInterrupt:
+                    recorder.exit_code = 130
+                    raise
+                except (UpscaleError, OSError, ValueError):
+                    recorder.exit_code = 1
+                    raise
+                recorder.exit_code = result
+                recorder.status = "completed_with_errors" if result else "completed"
+                measured.status = recorder.status
+        return result
+    finally:
+        if recorder.summary:
+            stats = recorder.summary
+            rss = stats["peak_sampled_rss_bytes"]
+            memory = f"{rss / 1048576:.1f} MiB" if rss is not None else "unavailable"
+            print(f"Trace: {recorder.path} | wall {stats['wall_seconds']:.3f}s | "
+                  f"CPU {stats['process_cpu_seconds']:.3f}s | sampled peak RSS {memory}", file=sys.stderr)
 
 
 def main(argv=None) -> int:
@@ -248,7 +324,7 @@ def main(argv=None) -> int:
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s: %(message)s")
     try:
-        return run(args)
+        return _run_with_trace(args)
     except (UpscaleError, OSError, ValueError) as e:
         if args.verbose:
             logging.exception("Failed")

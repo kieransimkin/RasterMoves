@@ -89,12 +89,14 @@ jobs:
         run: |
           VERSION=$(python -c 'import rastermoves; print(rastermoves.__version__)')
           python -m venv "$RUNNER_TEMP/wheel-test"
-          "$RUNNER_TEMP/wheel-test/bin/python" -m pip install dist/*.whl
+          WHEEL=$(find dist -maxdepth 1 -name '*.whl' -print -quit)
+          "$RUNNER_TEMP/wheel-test/bin/python" -m pip install "${WHEEL}[trace]"
           cp scripts/smoke_installed.py "$RUNNER_TEMP/smoke_installed.py"
-          (cd "$RUNNER_TEMP" && ./wheel-test/bin/python smoke_installed.py --version "$VERSION")
+          (cd "$RUNNER_TEMP" && ./wheel-test/bin/python smoke_installed.py --version "$VERSION" --trace)
           python -m venv "$RUNNER_TEMP/sdist-test"
-          "$RUNNER_TEMP/sdist-test/bin/python" -m pip install dist/*.tar.gz
-          (cd "$RUNNER_TEMP" && ./sdist-test/bin/python smoke_installed.py --version "$VERSION")
+          SDIST=$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)
+          "$RUNNER_TEMP/sdist-test/bin/python" -m pip install "${SDIST}[trace]"
+          (cd "$RUNNER_TEMP" && ./sdist-test/bin/python smoke_installed.py --version "$VERSION" --trace)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: python-dist

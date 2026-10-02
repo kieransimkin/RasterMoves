@@ -23,6 +23,7 @@ from .network import atomic_json
 from .pipeline import Upscaler, _prepare, target_size
 from .specs import ModelSpec
 from .registry import Registry
+from .tracing import current_trace, event, span, traced
 
 SUMMARY = "summary.json"
 FORMATS = {"png", "webp", "jpg", "tiff"}
@@ -42,6 +43,7 @@ def output_name(spec: ModelSpec, format: str = "png") -> str:
     return f"model-{spec.id}.{format}"
 
 
+@traced("comparison_validate")
 def _validate(source: Path, output_dir: Path, format: str, options: dict) -> None:
     if not source.is_file():
         raise UpscaleError("--all-models requires one input image file, not a directory.")
@@ -71,6 +73,7 @@ def _validate(source: Path, output_dir: Path, format: str, options: dict) -> Non
         raise UpscaleError("Use tile >= 0, tile-pad >= 0, and 0 <= overlap < tile (unless tile=0).")
 
 
+@traced("resume_verify")
 def _verified(row: dict, destination: Path, spec_hash: str) -> bool:
     if row.get("status") not in {"success", "reused"} or row.get("spec_sha256") != spec_hash:
         return False
@@ -83,6 +86,7 @@ def _verified(row: dict, destination: Path, spec_hash: str) -> bool:
         return False
 
 
+@traced("all_models")
 def run_all_models(
     source: str | Path,
     output_dir: str | Path,
@@ -119,6 +123,10 @@ def run_all_models(
         raise UpscaleError("Input overlaps a comparison output; use a different output directory.")
     if source == (output_dir / SUMMARY).resolve():
         raise UpscaleError("Input overlaps the comparison summary; use a different output directory.")
+    trace = current_trace()
+    if trace:
+        trace.protect_paths([source, output_dir / SUMMARY, *planned,
+                             *[p.with_suffix(p.suffix + ".json") for p in planned]])
     output_dir.mkdir(parents=True, exist_ok=True)
     # One writer per comparison folder. Do not hold a device while waiting for it.
     try:
@@ -175,6 +183,10 @@ def _run(source, directory, selected, sessions, options, format, overwrite, resu
                "started_at": _now(), "input": str(source), "output_directory": str(directory),
                "fingerprint": fingerprint, "config": config, "status": "running", "results": rows}
 
+    trace = current_trace()
+    if trace:
+        summary["trace_file"] = str(trace.path)
+
     def save():
         summary["updated_at"] = _now()
         summary["counts"] = {k: sum(row["status"] == k for row in rows)
@@ -189,6 +201,7 @@ def _run(source, directory, selected, sessions, options, format, overwrite, resu
             if resume and prior.get("output") == row["output"] and _verified(prior, destination, row["spec_sha256"]):
                 row.update({k: prior[k] for k in ("output_sha256", "report_sha256", "elapsed_seconds") if k in prior})
                 row["status"] = "reused"
+                event("model_reused", model_id=spec.id)
                 save()
                 if progress:
                     progress(index, len(rows), spec.id, "reused")
@@ -197,31 +210,39 @@ def _run(source, directory, selected, sessions, options, format, overwrite, resu
             save()
             if progress:
                 progress(index, len(rows), spec.id, "running")
-            started, up = time.perf_counter(), None
+            measured = None
             try:
-                up = Upscaler(spec.id, registry=registry, **sessions)
-                up.upscale_file(source, destination, overwrite=overwrite or resume, report=True, **options)
-                row["output_sha256"] = sha256_file(destination)
-                row["report_sha256"] = sha256_file(destination.with_suffix(destination.suffix + ".json"))
-                row["status"] = "success"
-            except KeyboardInterrupt:
-                row["status"] = "interrupted"
-                raise
-            except Exception as e:
-                # Plugin implementations may raise non-UpscaleError exceptions.
-                # Isolate them here; do not swallow SystemExit/KeyboardInterrupt.
-                row.update(status="failed", error=f"{type(e).__name__}: {e}")
-            finally:
-                if up is not None:
+                with span("model", model_id=spec.id) as measured:
+                    started, up = time.perf_counter(), None
                     try:
-                        up.close()
+                        up = Upscaler(spec.id, registry=registry, **sessions)
+                        up.upscale_file(source, destination, overwrite=overwrite or resume, report=True, **options)
+                        row["output_sha256"] = sha256_file(destination)
+                        row["report_sha256"] = sha256_file(destination.with_suffix(destination.suffix + ".json"))
+                        row["status"] = "success"
+                    except (KeyboardInterrupt, SystemExit):
+                        row["status"] = "interrupted"
+                        raise
                     except Exception as e:
-                        row["cleanup_error"] = f"{type(e).__name__}: {e}"
-                        if row["status"] != "interrupted":
-                            row["status"] = "failed"
-                    up = None
-                gc.collect()
-                row["elapsed_seconds"] = round(time.perf_counter() - started, 3)
+                        # Plugin implementations may raise non-UpscaleError exceptions.
+                        # Isolate them here; do not swallow SystemExit/KeyboardInterrupt.
+                        row.update(status="failed", error=f"{type(e).__name__}: {e}")
+                    finally:
+                        if up is not None:
+                            try:
+                                up.close()
+                            except Exception as e:
+                                row["cleanup_error"] = f"{type(e).__name__}: {e}"
+                                if row["status"] != "interrupted":
+                                    row["status"] = "failed"
+                            up = None
+                        gc.collect()
+                        row["elapsed_seconds"] = round(time.perf_counter() - started, 3)
+                        if measured is not None:
+                            measured.status = row["status"]
+            finally:
+                if measured is not None:
+                    row["performance"] = measured.summary
                 save()
             if progress:
                 progress(index, len(rows), spec.id, row["status"])

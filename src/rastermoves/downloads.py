@@ -14,6 +14,7 @@ from .errors import DownloadError, IntegrityError
 from .network import atomic_json, stream_download
 from .paths import cache_dir
 from .specs import Resource
+from .tracing import current_trace, traced
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +80,7 @@ class Downloader:
         key = r.sha256 or hashlib.sha256(json.dumps(r.urls).encode()).hexdigest()
         return self.root / "weights" / f"{key}.{r.format}"
 
+    @traced("verify_weights")
     def _verify(self, path: Path, r: Resource, *, cached=False) -> str:
         n = path.stat().st_size
         if n == 0 or n > self.max_bytes or (r.size is not None and n != r.size):
@@ -100,12 +102,16 @@ class Downloader:
                 raise IntegrityError("Cached file differs from its original download.")
         return digest
 
+    @traced("weights")
     def get(self, r: Resource) -> Path:
         if self.strict_checksums and not r.sha256:
             raise IntegrityError("No publisher checksum available; strict checksum mode refuses this model.")
         if r.size and r.size > self.max_bytes:
             raise DownloadError("Model exceeds the configured download limit.")
         path = self.target(r)
+        trace = current_trace()
+        if trace:
+            trace.protect_paths([path, path.with_suffix(path.suffix + ".json")])
         path.parent.mkdir(parents=True, exist_ok=True)
         with FileLock(str(path) + ".lock", timeout=600):
             if path.exists():
@@ -140,6 +146,7 @@ class Downloader:
             raise DownloadError("No usable model source. " + "; ".join(errors or ["No URLs listed."]) +
                                 " Supply a local checkpoint with --model-file or add an explicit mirror to a plugin.")
 
+    @traced("download")
     def _fetch(self, url: str, dest: Path, r: Resource):
         kind = source_kind(url)
         log.info("Downloading weights from %s", urlparse(url).hostname)

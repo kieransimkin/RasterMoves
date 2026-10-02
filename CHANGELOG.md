@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.1 — 2026-10-02
+
+- Add opt-in `--trace`, `--trace-file` and `--trace-interval` options for single-image,
+  batch, all-model and dry-run commands.
+- Stream Chrome JSON timelines with nested stage durations, process CPU seconds /
+  utilization, RSS/VMS and thread counters, plus system available-memory context.
+- Include per-model metrics in comparison summaries; preserve failure/interruption
+  traces, mark resumed results as reused rather than inventing new inference timings.
+- Distinguish download/cache verification, backend load, inference attempts (including
+  OOM retry markers), postprocessing, writes and cleanup.
+- Add a lazy optional `trace` dependency extra (`psutil`), also included in `all`/`dev`.
+- Never overwrite existing traces; choose numbered defaults on subsequent runs.
+- Add tracing documentation, regression tests and installed-artifact tracing smoke tests.
+- No model/plugin interface, checkpoint source, architecture or publication-credential changes.
+
 ## 0.2.0 — 2026-10-02
 
 - Add `upscale --all-models -o DIRECTORY`, with `--sync-models` for the full

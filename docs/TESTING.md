@@ -1,3 +1,72 @@
+# RasterMoves 0.2.1 resource-tracing validation
+
+Date: 2026-10-02. Base repository: `kieransimkin/RasterMoves`, commit
+`4c7bc12821edbb5ac32b6c5ed29e977260a29999` (the committed CI/all-models patch).
+The complete reconstructed baseline Git tree was verified against upstream:
+`9188c48a8194225a1c837de34d5b72dbdb8041b2`.
+
+## Observed local results
+
+- **228 tests passed; 2 optional pretrained-model tests skipped**, Python 3.13.5
+  on Linux, with psutil 7.2.2. The 180 existing tests remain passing; 48 trace
+  tests cover actual process sampling and deterministic recorder/CLI edge cases.
+- Actual CPU work and a memory allocation produced CPU-time, CPU-percentage,
+  RSS/VMS and thread counters. Clock-controlled tests verify the first-sample
+  omission, the one-core percentage convention (including 200%), and use of
+  actual elapsed time rather than the requested timer interval.
+- CLI tracing is exercised for a single image, batches, all eight starter model
+  IDs, offline dry-run, resume, one-model failure, Ctrl+C, safe filenames,
+  provenance/weights collisions, and optional-dependency errors. These image
+  tests use deterministic substitute models, not downloaded neural checkpoints.
+- Built-in weight-download, cache verification and backend-loading spans are
+  checked with stub transport/backend implementations. Real tile processing
+  with a controlled OOM substitute verifies failed attempt and retry events.
+- Disabled tracing is checked in a subprocess: no psutil import, sampler, trace
+  file, or altered image output. Exception, write, close, sampling and sampler
+  startup failures are tested; original application exceptions are preserved.
+- Wheel and source archive were built using the installed setuptools build
+  backend. Package names/versions, all eight manifests, metadata and required
+  files were checked using `scripts/release_tools.py dist`.
+- Both artifacts were installed in separate environments and run outside the
+  source checkout. CLI version/help, all-model planning with a trace, and a
+  synthetic-model tiled upscale with provenance plus a valid trace all passed.
+  Third-party dependencies were reused from the environment's preinstalled
+  packages through a `.pth` file; this is **not** a clean network installation
+  or dependency-resolution test. The initial fresh environment lacked these
+  dependencies, so they were explicitly exposed before the successful checks.
+- Incremental `git apply --check` / application passed in a clean worktree
+  matching the upstream base. Its full suite also passed: **228 passed, 2 skipped**
+  in 21.04 seconds. The complete patched Git tree matches the working tree used
+  to develop the change.
+- CI's existing Linux/Windows/macOS matrix now installs the trace test dependency;
+  built wheel/source smoke checks explicitly install `[trace]`. The container
+  runtime smoke also exercises tracing via the existing `--runtimes` option.
+
+## Limits of this validation
+
+No end-to-end pretrained-model upscale, GPU/MPS run, Windows/macOS execution,
+Perfetto browser session, Docker build, hosted GitHub Actions run, or package/
+container publication was performed here. Chrome JSON event structure, timing
+nesting and counter output are tested; compatibility follows Perfetto's documented
+format rather than a claim that its browser UI was exercised in this environment.
+
+Network access for dependency/model downloads is unavailable. The build frontend,
+Twine, Spandrel and ONNX Runtime are not installed; the setuptools backend was
+used directly, while the existing CI continues to use ordinary build/Twine steps.
+The two live-model tests require `RASTERMOVES_LIVE=1` and actual runtimes/weights.
+Actual PyTorch synthetic-checkpoint tests from the inherited suite do run locally.
+
+The example trace supplied with the patch bundle records real process resource
+measurements during a **synthetic repeat-model** upscale. It is a format/example
+artifact, not a benchmark or a measurement of a pretrained model's performance.
+
+See [PROFILING.md](PROFILING.md) for process scope, timing units, sampling accuracy,
+platform differences, failure limitations, and interpretation of resumed results.
+
+---
+
+## Historical 0.2.0 validation notes
+
 # RasterMoves 0.2.0 validation
 
 Base repository: `kieransimkin/RasterMoves`, commit

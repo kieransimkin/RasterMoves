@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .errors import UpscaleError
 from .specs import ModelSpec, Resource
+from .tracing import span
 
 
 def backend_factories(*, external=False) -> dict:
@@ -54,7 +55,8 @@ class ModelPlugin:
                 continue
             try:
                 path = downloader.get(resource)
-                loaded = factory(path, self.spec, device=device, precision=precision, extra_arches=extra_arches)
+                with span("backend_load", backend=resource.backend, model_id=self.spec.id):
+                    loaded = factory(path, self.spec, device=device, precision=precision, extra_arches=extra_arches)
                 return loaded, path, resource
             except UpscaleError as e:
                 errors.append(f"{resource.backend}/{resource.format}: {e}")

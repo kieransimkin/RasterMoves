@@ -21,6 +21,7 @@ from .plugins import backend_factories
 from .registry import Registry
 from .specs import ModelSpec
 from .tiling import upscale_array
+from .tracing import current_trace, span, traced
 
 DEFAULT_MODEL = "4x-realesr-general-x4v3"
 log = logging.getLogger(__name__)
@@ -66,6 +67,7 @@ def _high_bit_depth(image: Image.Image) -> bool:
     return False
 
 
+@traced("preprocess")
 def _prepare(image: Image.Image):
     if getattr(image, "n_frames", 1) != 1:
         raise UpscaleError("Animated/multi-page images are not supported. Extract frames first.")
@@ -95,6 +97,7 @@ class Upscaler:
 
     Use as a context manager to release model memory after a batch. Not thread-safe.
     """
+    @traced("session_init")
     def __init__(self, model: str | None = None, *, model_file=None, native_scale=None, cache_dir=None,
                  device="auto", backend="auto", precision="fp32", offline=False, strict_checksums=False,
                  extra_arches=False, model_dirs=(), external_plugins=False, registry: Registry | None = None):
@@ -121,6 +124,7 @@ class Upscaler:
         self.resource = None
         self.last_report = None
 
+    @traced("load_model")
     def load(self):
         if self.loaded is not None:
             return self.loaded
@@ -149,8 +153,9 @@ class Upscaler:
                     raise UpscaleError("No matching checksum manifest for local weights.")
             elif self.downloader.strict_checksums:
                 raise UpscaleError("Standalone local weights have no publisher checksum; select a model manifest.")
-            self.loaded = factory(self.local_file, self.spec, device=self.device, precision=self.precision,
-                                  extra_arches=self.extra_arches, validate_metadata=self.validate_metadata)
+            with span("backend_load", backend=kind, model_id=self.spec.id):
+                self.loaded = factory(self.local_file, self.spec, device=self.device, precision=self.precision,
+                                      extra_arches=self.extra_arches, validate_metadata=self.validate_metadata)
             self.weight_path = self.local_file
         else:
             self.loaded, self.weight_path, self.resource = self.plugin.load(
@@ -158,6 +163,7 @@ class Upscaler:
                 extra_arches=self.extra_arches, external_backends=self.external_plugins)
         return self.loaded
 
+    @traced("upscale_image")
     def upscale_image(self, image: Image.Image, *, tile=256, overlap=32, tile_pad=16,
                       scale=None, width=None, height=None, long_edge=None, alpha="lanczos",
                       max_output_mp=64, force_tiling=False, progress=None) -> Image.Image:
@@ -176,38 +182,42 @@ class Upscaler:
         native_size = (color.width * loaded.scale, color.height * loaded.scale)
         if target[0] > native_size[0] or target[1] > native_size[1]:
             log.warning("Final target exceeds native model scale; additional enlargement is Lanczos, not another AI pass.")
-        if loaded.input_channels == 1:
-            color = color.convert("L")
-        array = np.asarray(color, dtype=np.float32) / 255.0
-        if array.ndim == 2:
-            array = array[..., None]
+        with span("input_to_array"):
+            if loaded.input_channels == 1:
+                color = color.convert("L")
+            array = np.asarray(color, dtype=np.float32) / 255.0
+            if array.ndim == 2:
+                array = array[..., None]
         opts = dict(tile=tile, overlap=overlap, pad=tile_pad, max_output_pixels=max_pixels,
                     force_tiling=force_tiling, progress=progress)
         result = upscale_array(array, loaded, **opts)
-        pixels = np.rint(np.clip(result, 0, 1) * 255).astype(np.uint8)
-        if loaded.output_channels == 1:
-            pixels = pixels[..., 0]
-        output = Image.fromarray(pixels)
-        if output.size != target:
-            output = output.resize(target, Image.Resampling.LANCZOS)
-        if alpha_channel is not None:
-            if alpha == "model":
-                a = np.asarray(alpha_channel, dtype=np.float32)[..., None] / 255.0
-                if loaded.input_channels == 3:
-                    a = np.repeat(a, 3, axis=2)
-                a = upscale_array(a, loaded, **opts)
-                a = np.mean(a, axis=2)
-                alpha_channel = Image.fromarray(np.rint(np.clip(a, 0, 1) * 255).astype(np.uint8))
-            alpha_channel = alpha_channel.resize(target, Image.Resampling.LANCZOS)
-            output.putalpha(alpha_channel)
-        if icc and loaded.output_channels == 3:
-            output.info["icc_profile"] = icc
+        with span("postprocess"):
+            pixels = np.rint(np.clip(result, 0, 1) * 255).astype(np.uint8)
+            if loaded.output_channels == 1:
+                pixels = pixels[..., 0]
+            output = Image.fromarray(pixels)
+            if output.size != target:
+                output = output.resize(target, Image.Resampling.LANCZOS)
+            if alpha_channel is not None:
+                if alpha == "model":
+                    a = np.asarray(alpha_channel, dtype=np.float32)[..., None] / 255.0
+                    if loaded.input_channels == 3:
+                        a = np.repeat(a, 3, axis=2)
+                    a = upscale_array(a, loaded, **opts)
+                    a = np.mean(a, axis=2)
+                    alpha_channel = Image.fromarray(np.rint(np.clip(a, 0, 1) * 255).astype(np.uint8))
+                alpha_channel = alpha_channel.resize(target, Image.Resampling.LANCZOS)
+                output.putalpha(alpha_channel)
+            if icc and loaded.output_channels == 3:
+                output.info["icc_profile"] = icc
         # EXIF is intentionally not copied: orientation is applied; stale dimensions/GPS are omitted.
+        with span("report_checksum"):
+            weight_digest = sha256_file(self.weight_path) if self.weight_path else None
         self.last_report = {
             "software": "RasterMoves", "software_version": __version__,
             "created_at": datetime.now(timezone.utc).isoformat(), "model_id": self.spec.id,
             "model_license": self.spec.license, "model_page": self.spec.source_page,
-            "weight_sha256": sha256_file(self.weight_path) if self.weight_path else None,
+            "weight_sha256": weight_digest,
             "publisher_verified": bool(self.resource and self.resource.sha256),
             "backend": type(loaded).__name__, "device": loaded.device, "precision": loaded.precision,
             "input_size": list(color.size), "native_scale": loaded.scale, "output_size": list(output.size),
@@ -216,8 +226,12 @@ class Upscaler:
         }
         return output
 
+    @traced("upscale_file")
     def upscale_file(self, source, output, *, overwrite=False, report=False, **kwargs) -> Path:
         source, output = Path(source), Path(output)
+        trace = current_trace()
+        if trace:
+            trace.protect_paths([source, output, output.with_suffix(output.suffix + ".json")])
         if source.resolve() == output.resolve():
             raise UpscaleError("Input and output must be different files, even with --overwrite.")
         if output.exists() and not overwrite:
@@ -241,18 +255,22 @@ class Upscaler:
                 options.update(quality=95, subsampling=0)
             elif fmt == "WEBP":
                 options.update(lossless=True)
-            result.save(name, format=fmt, **options)
+            with span("write_image"):
+                result.save(name, format=fmt, **options)
             with FileLock(str(output) + ".lock", timeout=600):
                 if output.exists() and not overwrite:
                     raise UpscaleError(f"Output appeared while processing: {output}.")
                 os.replace(name, output)
                 if report:
                     payload = {**self.last_report, "input": str(source), "output": str(output)}
-                    atomic_json(output.with_suffix(output.suffix + ".json"), payload)
+                    with span("write_provenance"):
+                        atomic_json(output.with_suffix(output.suffix + ".json"), payload)
         finally:
             Path(name).unlink(missing_ok=True)
+            result.close()
         return output
 
+    @traced("model_cleanup")
     def close(self):
         if self.loaded is not None:
             self.loaded.close()

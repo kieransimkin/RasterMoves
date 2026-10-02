@@ -45,3 +45,19 @@ Source code was written for this project. No pretrained weights or third-party s
 packages are embedded. Dependency package licences and model-weight licences remain
 separate. OpenModelDB metadata attribution and GPL source terms are retained in
 THIRD_PARTY_NOTICES.md. The project is distributed under GPL-3.0-only.
+
+
+## Resource tracing (0.2.1)
+
+- Current psutil release API, including portable RSS/VMS and memory context:
+  https://psutil.io/7.2/
+- Python monotonic wall and process CPU timers:
+  https://docs.python.org/3/library/time.html#time.perf_counter
+  https://docs.python.org/3/library/time.html#time.process_time
+- Perfetto's support for Chrome JSON duration, counter and metadata events:
+  https://perfetto.dev/docs/getting-started/other-formats#chrome-json-format
+
+Sources verified on 2026-10-02. The psutil extra is capped below 8 pending review of
+its breaking API changes; the sampler uses the documented 5.9.8–7.x methods. Recorder
+CPU percentages are calculated from process-time deltas, not psutil's first-call
+CPU-percentage value. No GPU utilization or allocation-profiler data is inferred.

@@ -107,8 +107,8 @@ A successful rehearsal does **not** publish a production release or container. O
 ready, create the version tag at the tested commit:
 
 ```bash
-git tag -a v0.2.0 -m "RasterMoves 0.2.0"
-git push origin v0.2.0
+git tag -a v0.2.1 -m "RasterMoves 0.2.0"
+git push origin v0.2.1
 ```
 
 This runs tests on the exact tag, not on a later `main`. The source and wheel version
@@ -119,10 +119,10 @@ Update both declarations and `CHANGELOG.md` before a future tag. Do not move/reu
 For a manual production run of an existing tag:
 
 ```bash
-gh workflow run release.yml --ref v0.2.0 -f tag=v0.2.0 -f target=production
+gh workflow run release.yml --ref v0.2.1 -f tag=v0.2.1 -f target=production
 ```
 
-Using `--ref v0.2.0` also makes the workflow's environment/OIDC context a tag rather
+Using `--ref v0.2.1` also makes the workflow's environment/OIDC context a tag rather
 than `main`; this matters with tag-only environment protections. This command is not
 a substitute for **Re-run failed jobs** after a partial publication: versions cannot
 be uploaded repeatedly to PyPI/TestPyPI.
@@ -173,9 +173,9 @@ private GHCR packages cannot be pulled anonymously. Optional destinations marked
 ```bash
 python -m pip install --upgrade "rastermoves[all]==0.2.0"
 rastermoves --version
-docker pull ghcr.io/kieransimkin/rastermoves:0.2.0
-docker run --rm ghcr.io/kieransimkin/rastermoves:0.2.0 --version
-gh release view v0.2.0
+docker pull ghcr.io/kieransimkin/rastermoves:0.2.1
+docker run --rm ghcr.io/kieransimkin/rastermoves:0.2.1 --version
+gh release view v0.2.1
 ```
 
 Example Linux/macOS container invocation (Docker Desktop needs Linux AMD64 emulation
@@ -185,7 +185,7 @@ on non-AMD64 hosts):
 mkdir -p comparison .rastermoves-cache
 docker run --rm --user "$(id -u):$(id -g)" \
   -v "$PWD:/work" -v "$PWD/.rastermoves-cache:/cache" \
-  ghcr.io/kieransimkin/rastermoves:0.2.0 \
+  ghcr.io/kieransimkin/rastermoves:0.2.1 \
   upscale /work/input.png --all-models --sync-models -o /work/comparison
 ```
 
@@ -204,3 +204,11 @@ Checked 2026-10-02:
 - GitHub container publishing: https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images
 - GHCR authentication/access: https://docs.github.com/packages/working-with-a-github-packages-registry/working-with-the-container-registry
 - GitHub release lifecycle: https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases
+
+
+The 0.2.1 release also includes optional `rastermoves[trace]` support. `.[all]` installs
+it automatically, so the existing CPU container includes tracing without a separate
+Dockerfile change. The package job installs wheel/source artifacts with the `trace`
+extra and smoke-tests the installed CLI trace path. The container's existing
+`--runtimes` smoke test now exercises tracing too. Publisher names, environments,
+permissions and secrets are unchanged.
