@@ -20,9 +20,9 @@ torch = ["torch>=2.6", "torchvision>=0.21", "spandrel>=0.4.2,<0.5", "safetensors
 onnx = ["onnxruntime>=1.20"]
 onnx-gpu = ["onnxruntime-gpu>=1.20"]
 trace = ["psutil>=5.9.8,<8"]
-gdrive = ["gdown>=5.2,<6"]
+gdrive = ["gdown>=5.2,<7"]
 extra-arches = ["spandrel-extra-arches>=0.2"]
-all = ["psutil>=5.9.8,<8", "torch>=2.6", "torchvision>=0.21", "spandrel>=0.4.2,<0.5", "safetensors>=0.4.5", "onnxruntime>=1.20", "gdown>=5.2,<6"]
+all = ["psutil>=5.9.8,<8", "torch>=2.6", "torchvision>=0.21", "spandrel>=0.4.2,<0.5", "safetensors>=0.4.5", "onnxruntime>=1.20", "gdown>=5.2,<7"]
 dev = ["psutil>=5.9.8,<8", "pytest>=8", "build>=1.2", "ruff>=0.9", "twine>=6", "PyYAML>=6", "tomli>=2; python_version < '3.11'"]
 
 [project.urls]
