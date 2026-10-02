@@ -19,6 +19,7 @@ def main():
     assert resources.files("rastermoves").joinpath("sweep.py").is_file()
     assert resources.files("rastermoves").joinpath("tracing.py").is_file()
     assert resources.files("rastermoves").joinpath("py.typed").is_file()
+    assert resources.files("rastermoves").joinpath("refinement", "diffusers_backend.py").is_file()
     subprocess.run([sys.executable, "-m", "rastermoves", "--version"], check=True)
     subprocess.run([sys.executable, "-m", "rastermoves", "upscale", "--help"], check=True, stdout=subprocess.DEVNULL)
     with tempfile.TemporaryDirectory() as temp:
@@ -30,6 +31,22 @@ def main():
                                  "upscale", str(source), "--all-models", "--dry-run", "--offline",
                                  "-o", str(directory / "outputs")], check=True, text=True, capture_output=True)
         assert json.loads(result.stdout)["model_count"] == 8
+        refined = directory / "refined.png"
+        command = [sys.executable, "-m", "rastermoves", "refine", str(source), "-o", str(refined),
+                   "--refine-strength", "0", "--offline"]
+        if args.trace or args.runtimes:
+            command.append("--trace")
+        subprocess.run(command, check=True, capture_output=True, text=True)
+        assert Image.open(refined).size == (4, 3)
+        baseline = directory / "refined.baseline.png"
+        assert baseline.is_file()
+        report_path = directory / "refined.png.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report["status"] == "success" and not report["refinement"]["generative"]
+        assert report["refinement"]["metrics"]["executed_denoising_steps"] == 0
+        before = report_path.read_bytes()
+        subprocess.run(command + ["--resume"], check=True, capture_output=True, text=True)
+        assert before == report_path.read_bytes()
         if args.trace or args.runtimes:
             trace_file = directory / "installed.trace.json"
             subprocess.run([sys.executable, "-m", "rastermoves", "--cache-dir", str(directory / "cache"),

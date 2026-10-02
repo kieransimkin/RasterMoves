@@ -80,6 +80,8 @@ def parser():
     up.add_argument("--offline", action="store_true")
     up.add_argument("--strict-checksums", action="store_true")
     up.add_argument("--extra-arches", action="store_true", help="Opt in to installed extra architectures with additional licences.")
+    from .refinement.cli import add_arguments
+    add_arguments(commands, up)
     return p
 
 
@@ -89,7 +91,7 @@ def _registry(args):
 
 def _doctor():
     data = {"rastermoves": __version__, "python": sys.version.split()[0], "packages": {}}
-    for package in ("torch", "torchvision", "spandrel", "safetensors", "onnxruntime", "onnxruntime-gpu", "gdown", "huggingface-hub", "psutil"):
+    for package in ("torch", "torchvision", "spandrel", "safetensors", "onnxruntime", "onnxruntime-gpu", "gdown", "huggingface-hub", "psutil", "diffusers", "transformers", "accelerate"):
         try:
             data["packages"][package] = version(package)
         except PackageNotFoundError:
@@ -107,15 +109,15 @@ def _doctor():
     return data
 
 
-def batch_jobs(source: Path, output: Path | None, *, recursive=False, format="png"):
+def batch_jobs(source: Path, output: Path | None, *, recursive=False, format="png", suffix="upscaled"):
     if source.is_file():
-        dest = output or source.with_name(f"{source.name}_upscaled.{format}")
+        dest = output or source.with_name(f"{source.name}_{suffix}.{format}")
         if dest.is_dir():
-            dest = dest / f"{source.name}_upscaled.{format}"
+            dest = dest / f"{source.name}_{suffix}.{format}"
         return [(source, dest)]
     if not source.is_dir():
         raise UpscaleError(f"Input does not exist: {source}")
-    dest_root = output or source.with_name(source.name + "_upscaled")
+    dest_root = output or source.with_name(source.name + "_" + suffix)
     if dest_root.resolve() == source.resolve():
         raise UpscaleError("Batch output directory must differ from the input directory.")
     if dest_root.is_file():
@@ -129,7 +131,7 @@ def batch_jobs(source: Path, output: Path | None, *, recursive=False, format="pn
             continue
         relative = path.relative_to(source)
         # Keep the original extension in the output stem so foo.jpg and foo.png cannot collide.
-        dest = dest_root / relative.parent / f"{relative.name}_upscaled.{format}"
+        dest = dest_root / relative.parent / f"{relative.name}_{suffix}.{format}"
         result.append((path, dest))
     if not result:
         raise UpscaleError("No supported images found.")
@@ -138,6 +140,10 @@ def batch_jobs(source: Path, output: Path | None, *, recursive=False, format="pn
 
 def _all_models(args) -> int:
     from .sweep import output_name, run_all_models
+    from .refinement.cli import configuration
+    refinement = configuration(args) if args.refiner else None
+    if refinement and args.format == "jpg":
+        raise UpscaleError("Refinement comparisons require lossless output, not JPEG.")
     if args.model_file or args.native_scale is not None or args.recursive:
         raise UpscaleError("--all-models cannot be combined with --model-file, --native-scale or --recursive.")
     if args.output is None:
@@ -167,7 +173,7 @@ def _all_models(args) -> int:
     print(f"Selected {len(specs)} model plugins. Weights download as needed; the full catalogue can use substantial disk space.", file=sys.stderr)
     if args.dry_run:
         print(json.dumps({"dry_run": True, "input": str(args.input), "output_directory": str(args.output),
-                          "model_count": len(specs), "models": [
+                          "model_count": len(specs), "refinement": refinement, "models": [
                               {"id": s.id, "license": s.license, "native_scale": s.scale,
                                "output": str(args.output / output_name(s, args.format)),
                                "resource_sizes_bytes": [r.size for r in s.resources]} for s in specs]}, indent=2))
@@ -181,7 +187,7 @@ def _all_models(args) -> int:
         print(f"[{index}/{total}] {model}: {status}", file=sys.stderr)
     summary = run_all_models(args.input, args.output, specs, session_options=sessions,
                              image_options=options, format=args.format, registry=registry, overwrite=args.overwrite,
-                             resume=args.resume, progress=progress)
+                             resume=args.resume, progress=progress, refinement=refinement)
     for row in summary["results"]:
         if row["status"] in {"success", "reused"}:
             print(Path(summary["output_directory"]) / row["output"])
@@ -192,6 +198,12 @@ def _all_models(args) -> int:
 
 
 def run(args) -> int:
+    from .refinement.cli import run_metadata, run_refinement, validate_selection
+    validate_selection(args)
+    if args.command in {"refiners", "download-refiner"}:
+        return run_metadata(args)
+    if args.command == "refine" or (args.command == "upscale" and args.refiner and not args.all_models):
+        return run_refinement(args)
     if args.command == "doctor":
         print(json.dumps(_doctor(), indent=2))
     elif args.command == "sync":
@@ -262,9 +274,9 @@ def run(args) -> int:
 
 
 def _run_with_trace(args) -> int:
-    enabled = args.command == "upscale" and (args.trace or args.trace_file is not None)
+    enabled = args.command in {"upscale", "refine"} and (args.trace or args.trace_file is not None)
     if not enabled:
-        if args.command == "upscale" and args.trace_interval is not None:
+        if args.command in {"upscale", "refine"} and args.trace_interval is not None:
             raise UpscaleError("--trace-interval requires --trace or --trace-file.")
         return run(args)
     protected = [args.input, args.model_file]
@@ -276,13 +288,18 @@ def _run_with_trace(args) -> int:
         default = args.output / "trace.json"
         protected.append(args.output / "summary.json")
     else:
-        jobs = batch_jobs(args.input, args.output, recursive=args.recursive, format=args.format)
+        jobs = batch_jobs(args.input, args.output, recursive=args.recursive, format=args.format,
+                          suffix="refined" if args.command == "refine" else "upscaled")
         for source, output in jobs:
             protected.extend((source, output, output.with_suffix(output.suffix + ".json")))
+            if args.refiner:
+                from .refinement.api import paths_for
+                protected.extend(paths_for(output).values())
+                protected.append(args.protect_mask)
         if args.input.is_file():
             default = jobs[0][1].with_suffix(jobs[0][1].suffix + ".trace.json")
         else:
-            default = (args.output or args.input.with_name(args.input.name + "_upscaled")) / "trace.json"
+            default = (args.output or args.input.with_name(args.input.name + ("_refined" if args.command == "refine" else "_upscaled"))) / "trace.json"
     options = {key: getattr(args, key) for key in (
         "backend", "device", "precision", "tile", "overlap", "tile_pad", "all_models", "dry_run", "resume")}
     recorder = TraceRecorder(args.trace_file or default,
@@ -297,7 +314,7 @@ def _run_with_trace(args) -> int:
     try:
         with recorder:
             print(f"Recording resource trace: {recorder.path}", file=sys.stderr)
-            with span("command", command="upscale") as measured:
+            with span("command", command=args.command) as measured:
                 try:
                     result = run(args)
                 except KeyboardInterrupt:

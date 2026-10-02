@@ -220,3 +220,24 @@ worker threads. Do not activate two simultaneous recorders in the same operation
 - [psutil 7.2 API](https://psutil.io/7.2/): memory/CPU metric meanings and platform differences.
 - [Python time module](https://docs.python.org/3/library/time.html): wall and process CPU timers.
 - [Perfetto Chrome JSON support](https://perfetto.dev/docs/getting-started/other-formats#chrome-json-format): duration and counter events.
+
+
+## Native refinement spans and CUDA counters (0.3.0)
+
+`refine ... --trace` and `upscale ... --refiner ID --trace` add nested stages for
+baseline creation, pinned downloads/checksums, loading, tiles, VAE encode/decode,
+denoising, compositing, writing and cleanup. They retain the existing process sampler.
+The native refinement backend also records per-tile wall/process-CPU time and actual
+executed denoising steps in image reports even when a timeline is not requested.
+
+When refinement uses CUDA, reports include `cuda_peak_allocated_bytes` and
+`cuda_peak_reserved_bytes`, reset for each tile. These are PyTorch allocator peaks,
+not total device usage, GPU utilisation percentages or per-model-only allocation.
+They include resident weights and other allocations in that process. No comparable
+CUDA metric is fabricated for MPS/CPU. GPU work is synchronised at phase boundaries,
+not every denoising step. This extension does not profile the existing feed-forward
+backend's CUDA allocations or arbitrary external worker processes.
+
+Outputs/baselines/masks and reports are protected from trace filename collisions.
+Resumed verified results emit a reuse marker without inventing new inference time.
+See [REFINEMENT.md](REFINEMENT.md) for scope, overhead and failure semantics.

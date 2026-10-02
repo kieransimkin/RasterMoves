@@ -146,3 +146,31 @@ does not grant permission to replace traces. You can toggle tracing when resumin
 with the same software version, input and processing settings. As before, upgrading
 from 0.2.0 to 0.2.1 changes the version fingerprint: use a new folder or `--overwrite`.
 See [PROFILING.md](PROFILING.md) for interpretation and measurement limits.
+
+
+## Explicit post-upscale refinement (0.3.0)
+
+```bash
+rastermoves upscale input.png --all-models -o comparison --refiner sd15-tile --seed 123 --trace
+rastermoves upscale input.png --all-models -o comparison --refiner sd15-tile --seed 123 --resume
+```
+
+This applies exactly one selected same-size refiner after each selected upscaler.
+There is no implicit refiner/seed cross product. Existing runs without `--refiner`
+retain their original semantics and do not import a diffusion runtime. Refinement
+dependencies require the separate `.[refine]` extra; they are not installed by `.[all]`.
+Only lossless PNG/WebP/TIFF outputs are allowed in a refinement workflow.
+
+Each result gains `model-ID.baseline.png` and its report; `model-ID.png.json` becomes
+a mandatory workflow journal. `summary.json` tracks additional baseline artifact
+hashes and fingerprints the selected refiner, all settings, runtime versions and mask
+bytes. Baseline corruption, model-manifest changes and tracked output corruption are
+not mistaken for a valid reused result. A failed refiner retains an intact baseline,
+which stage-level resume can use instead of recomputing the upscale. A different
+refiner/seed/settings requires a new comparison or explicit `--overwrite`.
+
+One protection mask is applied to the working image for each model and must have its
+exact dimensions. For different model scales, use a common final-size option such as
+`--width 3000`; otherwise incompatible mask sizes fail for those models. Costs can be
+large: inspect the ordinary dry-run plus its refinement description before a catalogue
+sweep. No synthetic image or no-op test constitutes a pretrained benchmark.

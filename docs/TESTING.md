@@ -237,3 +237,90 @@ checksum before inference.
   "onnx_error": "No module named 'onnxruntime'"
 }
 ```
+
+
+---
+
+# RasterMoves 0.3.0 generative-refinement patch — validation
+
+Date: 2026-10-02
+Target repository: kieransimkin/RasterMoves
+Base commit: a0b3349b84534b28a55bc94b6d63e2d491dcc21a (tracing)
+Verified base Git tree: 3666a1b2683057dd3371922a14664bb87906271c
+
+## Source provenance
+
+The connected GitHub integration returned the base commit and tree. Direct Git clone
+was unavailable in this environment. The supplied 0.1.1 package and the already-applied
+0.2.0/0.2.1 patches were reconstructed locally, including the two patch files tracked
+upstream. `git write-tree` exactly matched the upstream tree above. The final change
+set is a normal Git unified diff against this byte-for-byte verified base tree, not an
+assumed copy of an earlier release. No remote branch, tag, release or package was written.
+
+## Executed checks
+
+- Baseline before changes: 228 passed, 2 optional pretrained tests skipped.
+- Updated full suite: 346 passed, 6 skipped on Linux/Python 3.13.5.
+- Refinement subset: 118 passed, 4 skipped.
+- Existing upscaler, all-model, tracing, release-tool and workflow-contract regressions
+  remain in the passing full suite.
+- Real CPU Torch 2.10.0 tensor checkpoints were used to test restricted state-dict loading.
+  No unsafe pickle fallback is allowed. Adapter tests otherwise used fake Diffusers
+  pipeline objects and synthetic images, not pretrained image models.
+- Pinned-source/config validation, safetensors allowlists, known SD1.5 Tile checkpoint
+  hash enforcement, offline flags, content-address checks and configuration-before-weight
+  download ordering were tested using local fixtures/mocked downloads.
+- Tile coverage, edge padding/cropping, stable coordinate seeds, immutable baseline
+  inputs, mask protection and outward feathering, alpha, blending and color matching
+  were tested with deterministic synthetic pixels.
+- Stage journals, interrupted/failed refinement, retained baselines, resume hashes,
+  tampered outputs, mismatched configs, all-model continuation, no co-resident upscaler/
+  refiner lifecycle, output collision handling, trace spans and lazy imports were tested.
+- Wheel and source archive built successfully through setuptools.build_meta, the project's
+  configured build backend. The standalone `build`/`twine` packages were unavailable;
+  no local twine check is claimed.
+- Existing release_tools.py distribution validation passed for name/version, all eight
+  model manifests, packaged data, release tooling and documentation.
+- Both wheel and source distribution were installed into separate environments and
+  smoke-tested outside the source checkout. They reused preinstalled dependencies via
+  a shared site-packages path (`--no-deps` / no network). This verifies artifact content
+  and installed behavior, NOT a fresh online dependency-resolution/install matrix.
+- Installed checks covered imports, version, CLI help, eight-model dry-run, refinement
+  no-op output at unchanged size, baseline/report retention, trace output, and verified
+  resume. The no-op deliberately runs zero denoising steps and proves no visual quality.
+
+The downloadable patch bundle also records its SHA-256 and clean-apply checks.
+
+## Not executed / explicitly unverified
+
+Attempting to install diffusers==0.35.2, Transformers and Accelerate failed because the
+environment package index supplied no matching downloadable distribution. Consequently:
+
+- Two new real Diffusers tiny-random-weight tests were skipped locally.
+- Two new full pretrained refinement tests were skipped locally.
+- Two existing pretrained upscaler tests were skipped locally.
+- No actual Stable Diffusion/SDXL pretrained upscale/refinement was run.
+- No CUDA/MPS inference, real GPU offload, GPU memory counter comparison, model download
+  end-to-end, visual seam/fidelity assessment or performance benchmark was completed.
+- Hosted GitHub Actions, online wheel dependency resolution, PyPI publication, container
+  builds/publication and browser trace-viewer rendering were not executed.
+
+A dedicated `refinement-runtime` CI job installs the optional runtime and runs both tiny
+random-weight SD1.5/SDXL tests with RASTERMOVES_REQUIRE_DIFFUSERS=1. Missing/broken
+imports then fail rather than skip. It is part of the reusable release test workflow.
+Those CI tests are included, not claimed to have run in this environment.
+
+Full pretrained tests require explicit RASTERMOVES_REFINE_LIVE=1, optionally
+RASTERMOVES_REFINE_DEVICE=cuda. They download multi-gigabyte model bundles and should
+be followed by visual evaluation on representative inputs before making quality claims.
+
+## Scope
+
+Implemented: native SD1.5/SDXL ControlNet Tile same-size refinement, standalone and
+chained commands, baseline/mask/alpha/resume/tracing support, explicit one-refiner
+all-model runs and local plugin entry points.
+
+Not implemented: SeedVR2/VOSR/SUPIR/FLUX or other restoration adapters, a ComfyUI bridge,
+shared-latent MultiDiffusion, an extra seam-fix diffusion pass, arbitrary model overrides,
+per-tile latent resume, or image-quality claims. These were separate later research
+recommendations, not silently substituted by a different model.

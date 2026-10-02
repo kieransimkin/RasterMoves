@@ -79,6 +79,13 @@ def _verified(row: dict, destination: Path, spec_hash: str) -> bool:
         return False
     sidecar = destination.with_suffix(destination.suffix + ".json")
     try:
+        if row.get("refinement_artifacts"):
+            from .refinement.api import paths_for
+            paths = paths_for(destination)
+            for key in ("baseline", "baseline_report"):
+                item = row["refinement_artifacts"].get(key, {})
+                if not paths[key].is_file() or sha256_file(paths[key]) != item.get("sha256"):
+                    return False
         return (destination.is_file() and sidecar.is_file()
                 and sha256_file(destination) == row.get("output_sha256")
                 and sha256_file(sidecar) == row.get("report_sha256"))
@@ -99,6 +106,7 @@ def run_all_models(
     overwrite: bool = False,
     resume: bool = False,
     progress: Callable[[int, int, str, str], None] | None = None,
+    refinement: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Attempt every model, writing images, provenance sidecars and an atomic summary.
 
@@ -117,6 +125,12 @@ def run_all_models(
     if resume and overwrite:
         raise UpscaleError("Choose --resume or --overwrite, not both.")
     _validate(source, output_dir, format, options)
+    if refinement:
+        from .refinement.api import refinement_identity, paths_for, validate_paths
+        refinement_identity(refinement)  # Fail early for invalid settings/masks.
+        for spec in selected:
+            validate_paths(source, paths_for(output_dir / output_name(spec, format)),
+                           mask=Path(refinement["protect_mask"]) if refinement.get("protect_mask") else None)
     # Never overwrite an input, even if it happens to use a planned output name.
     planned = [output_dir / output_name(spec, format) for spec in selected]
     if any(source == p.resolve() or source == p.with_suffix(p.suffix + ".json").resolve() for p in planned):
@@ -131,12 +145,12 @@ def run_all_models(
     # One writer per comparison folder. Do not hold a device while waiting for it.
     try:
         with FileLock(str(output_dir / ".rastermoves-sweep.lock"), timeout=0):
-            return _run(source, output_dir, selected, sessions, options, format, overwrite, resume, progress, registry)
+            return _run(source, output_dir, selected, sessions, options, format, overwrite, resume, progress, registry, refinement)
     except Timeout as e:
         raise UpscaleError(f"Another comparison is using {output_dir}.") from e
 
 
-def _run(source, directory, selected, sessions, options, format, overwrite, resume, progress, registry):
+def _run(source, directory, selected, sessions, options, format, overwrite, resume, progress, registry, refinement=None):
     summary_path = directory / SUMMARY
     # Cache location/network permissions do not affect output identity. Include
     # custom plugin locations so changing installed overrides invalidates resume.
@@ -145,6 +159,9 @@ def _run(source, directory, selected, sessions, options, format, overwrite, resu
     identity_sessions["model_dirs"] = [str(Path(p).expanduser().resolve()) for p in sessions.get("model_dirs", [])]
     config = {"software_version": __version__, "input_sha256": sha256_file(source), "format": format,
               "image_options": options, "session_options": identity_sessions}
+    if refinement:
+        from .refinement.api import refinement_identity
+        config["refinement"] = refinement_identity(refinement)
     fingerprint = _digest(config)
     previous = {}
     if resume:
@@ -172,7 +189,13 @@ def _run(source, directory, selected, sessions, options, format, overwrite, resu
         tracked = prior.get("output") == name
         if not overwrite and not (resume and tracked) and (dest.exists() or sidecar.exists()):
             raise UpscaleError(f"Untracked/existing comparison output: {dest}. Use a new folder or --overwrite.")
-        for path in (dest, sidecar):
+        extra_paths = []
+        if refinement:
+            from .refinement.api import paths_for
+            extra_paths = [paths_for(dest)[k] for k in ("baseline", "baseline_report")]
+            if not overwrite and not (resume and tracked) and any(p.exists() for p in extra_paths):
+                raise UpscaleError(f"Existing refinement baseline for {dest}; use --resume or --overwrite.")
+        for path in (dest, sidecar, *extra_paths):
             # Existing directories/symlinks are never candidates for replacement.
             if path.is_symlink() or (path.exists() and not path.is_file()):
                 raise UpscaleError(f"Comparison output must be a regular file, not a directory or symlink: {path}")
@@ -200,6 +223,8 @@ def _run(source, directory, selected, sessions, options, format, overwrite, resu
             prior = previous.get(spec.id, {})
             if resume and prior.get("output") == row["output"] and _verified(prior, destination, row["spec_sha256"]):
                 row.update({k: prior[k] for k in ("output_sha256", "report_sha256", "elapsed_seconds") if k in prior})
+                if prior.get("refinement_artifacts"):
+                    row["refinement_artifacts"] = prior["refinement_artifacts"]
                 row["status"] = "reused"
                 event("model_reused", model_id=spec.id)
                 save()
@@ -215,8 +240,23 @@ def _run(source, directory, selected, sessions, options, format, overwrite, resu
                 with span("model", model_id=spec.id) as measured:
                     started, up = time.perf_counter(), None
                     try:
-                        up = Upscaler(spec.id, registry=registry, **sessions)
-                        up.upscale_file(source, destination, overwrite=overwrite or resume, report=True, **options)
+                        if refinement:
+                            from .refinement.api import WorkflowUpscaler
+                            up = WorkflowUpscaler(spec.id, registry=registry, refinement=refinement, **sessions)
+                            sidecar = destination.with_suffix(destination.suffix + ".json")
+                            tracked = prior.get("output") == row["output"]
+                            same_spec = prior.get("spec_sha256") == row["spec_sha256"]
+                            intact_report = (sidecar.is_file() and
+                                (prior.get("status") not in {"success", "reused"}
+                                 or sha256_file(sidecar) == prior.get("report_sha256")))
+                            workflow_resume = bool(resume and tracked and same_spec and intact_report)
+                            up.upscale_file(source, destination,
+                                            overwrite=overwrite or (resume and tracked and not workflow_resume),
+                                            resume=workflow_resume, report=True, **options)
+                            row["refinement_artifacts"] = up.artifacts()
+                        else:
+                            up = Upscaler(spec.id, registry=registry, **sessions)
+                            up.upscale_file(source, destination, overwrite=overwrite or resume, report=True, **options)
                         row["output_sha256"] = sha256_file(destination)
                         row["report_sha256"] = sha256_file(destination.with_suffix(destination.suffix + ".json"))
                         row["status"] = "success"

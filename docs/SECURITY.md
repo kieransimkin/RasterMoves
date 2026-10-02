@@ -59,3 +59,24 @@ are not a single two-file transaction; a report write failure can leave a valid 
 EXIF/GPS metadata is not copied. Provenance sidecars contain local input/output paths;
 review them before sharing. Cached manifests may contain author-provided URLs and
 text. Use appropriate terminal/log handling for third-party catalogue content.
+
+
+## Diffusion component loading (0.3.0)
+
+The opt-in native refiner downloads an explicit allowlist of data/config/weight files
+from immutable Hugging Face revisions. It uses fixed Diffusers pipeline classes,
+rejects custom component loaders and validates SD1.5/SDXL pairing before large weight
+downloads. Loading is local-only after download; no remote repository Python code is
+executed. Base/SDXL weights require safetensors. The pinned original SD1.5 Tile `.bin`
+is additionally checked against its known SHA-256 and loaded with Torch
+`weights_only=True`; no unsafe pickle fallback exists. Installed Python plugins remain
+trusted code and require explicit opt-in. Native parser/dependency security is not
+guaranteed by file integrity checks.
+
+Integrity records distinguish computed file hashes from independently verifiable
+cache content addresses. Strict checksum mode refuses unverifiable files (for example,
+some copied Windows cache layouts) rather than downgrading silently. Model licences
+apply separately. Authentication is delegated to HF_TOKEN/huggingface_hub. Reports
+include prompts and local file paths; review them before sharing. No telemetry or
+external inference service is introduced. Image content stays local after weights
+have downloaded. The SD1.5 base safety checker is preserved.

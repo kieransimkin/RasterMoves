@@ -5,7 +5,7 @@ Each model is an independent plugin, normally a small JSON manifest. Shared PyTo
 and ONNX Runtime backends handle architecture loading and inference. Weights are fetched
 from the model's recorded sources only when needed, verified, and cached for later use.
 
-**Version:** 0.2.1. Distribution name: `rastermoves`. See [release setup](docs/RELEASING.md)
+**Version:** 0.3.0. Distribution name: `rastermoves`. See [release setup](docs/RELEASING.md)
 for PyPI, TestPyPI, GitHub Releases and container publishing.
 It is an independent implementation, not an official OpenModelDB product.
 
@@ -92,6 +92,55 @@ failures, not presented as successful results. Each model's licence still applie
 Use a new output folder, `--resume`, or `--overwrite` explicitly. Standard tile,
 precision, device, final-size, format, alpha, offline and checksum options also apply.
 See [all-model comparisons](docs/ALL_MODELS.md) for details and resume boundaries.
+
+## Optional generative detail refinement
+
+RasterMoves can now **upscale, then refine at the same dimensions**, or refine an
+already enlarged image. The independent `sd15-tile` and `sdxl-tile` workflows use
+ControlNet Tile with image-to-image diffusion. This synthesises plausible detail;
+it is **not verified recovery of information**. Refinement is always opt-in on
+`upscale`. Ordinary upscaling, model IDs and existing defaults are unchanged.
+
+```bash
+# Add the separate diffusion extra. Install the appropriate PyTorch build for your hardware.
+python -m pip install -e ".[refine,trace]"
+
+rastermoves refiners
+rastermoves upscale input.png -o enhanced.png --refiner sd15-tile --seed 123 --trace
+rastermoves refine already-upscaled.png -o enhanced.png --refiner sdxl-tile --seed 123
+
+# White mask pixels protect lettering/faces; mask dimensions must match the working image.
+rastermoves refine already-upscaled.png -o enhanced.png --protect-mask protected.png
+
+# Preview without weight downloads, or resume a verified result / interrupted workflow.
+rastermoves refine already-upscaled.png -o enhanced.png --dry-run
+rastermoves refine already-upscaled.png -o enhanced.png --resume
+```
+
+Every workflow saves **`enhanced.baseline.png`** and its report before attempting
+refinement, plus **`enhanced.png.json`** with component revisions, checksums, seeds,
+parameters and actual denoising-step counts. Failed refinement preserves the baseline;
+`--resume` verifies hashes and can reuse it. Outputs must be lossless PNG/WebP/TIFF.
+Transparency is retained and fully protected pixels are restored from the baseline.
+
+Weights are **multi-gigabyte, first-use downloads**, pinned to specific Hugging Face
+commits. No repository Python code is downloaded/executed. The SD1.5 Tile checkpoint
+uses restricted tensor-only loading; other components require safetensors. Full-precision
+files are downloaded and cast for inference; low GPU precision does not reduce download
+size. Component licences apply separately. `--offline` requires all pinned files cached.
+
+`--refine-tile` and `--refine-overlap` control diffusion independently of existing
+upscaler tiles. On CUDA, `--refine-offload model` trades speed for reduced resident GPU
+memory. Existing `--trace` records refinement stages, with CUDA allocator peaks included
+in refinement reports when applicable. CPU/MPS routes exist but hardware performance is
+not promised. Tiling bounds inference work, not total output-buffer RAM.
+
+The heavy `refine` extra is intentionally **not part of `all`, default dependencies,
+or the default CPU container**. Use `.[all,refine]` explicitly for both toolsets.
+`upscale --all-models --refiner sd15-tile` applies just that refiner to every selected
+upscaler; there is no implicit refiner/seed cross product. See the
+[complete refinement guide](docs/REFINEMENT.md) for presets, masks, caching, resume,
+plugins, test limitations, and the Python API.
 
 ## Timing and resource traces
 

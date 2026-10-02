@@ -61,3 +61,27 @@ Sources verified on 2026-10-02. The psutil extra is capped below 8 pending revie
 its breaking API changes; the sampler uses the documented 5.9.8–7.x methods. Recorder
 CPU percentages are calculated from process-time deltas, not psutil's first-call
 CPU-percentage value. No GPU utilization or allocation-profiler data is inferred.
+
+
+## Generative refinement implementation references (checked 2026-10-02)
+
+These primary sources informed the API adapter and pinned workflow metadata. This
+list is not evidence of successful pretrained execution in the patch environment.
+
+- Diffusers 0.35.2 SD1.5 ControlNet img2img source/signature: https://github.com/huggingface/diffusers/blob/v0.35.2/src/diffusers/pipelines/controlnet/pipeline_controlnet_img2img.py
+- SDXL counterpart: https://github.com/huggingface/diffusers/blob/v0.35.2/src/diffusers/pipelines/controlnet/pipeline_controlnet_sd_xl_img2img.py
+- Img2img strength/steps: https://huggingface.co/docs/diffusers/en/using-diffusers/img2img
+- Memory/offload/VAE tiling: https://huggingface.co/docs/diffusers/en/optimization/memory
+- Callback API: https://huggingface.co/docs/diffusers/en/using-diffusers/callback
+- SD1.5 base: https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/tree/451f4fe16113bff5a5d2269ed5ad43b0592e9a14
+- Original SD1.5 Tile: https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/tree/3f877705c37010b7221c3d10743307d6b5b6efac
+- SD1.5 Tile file hash: https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/blob/3f877705c37010b7221c3d10743307d6b5b6efac/diffusion_pytorch_model.bin
+- SDXL base: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/tree/462165984030d82259a11f4367a4eed129e94a7b
+- Xinsir Tile: https://huggingface.co/xinsir/controlnet-tile-sdxl-1.0/tree/1ae8d9529efe58f7362a987363ff86a7904dc84f
+- Hub caching/downloads: https://huggingface.co/docs/huggingface_hub/en/guides/download
+- Restricted loading: https://docs.pytorch.org/docs/stable/generated/torch.load.html
+- CUDA allocator measurements: https://docs.pytorch.org/docs/stable/generated/torch.cuda.memory.max_memory_allocated.html
+
+Tile assembly in this package is independent frozen-image crop/blend code. No code
+from the non-commercial AUTOMATIC1111 tiled-diffusion extension, no guided-filter
+repository Python, and no ComfyUI custom-node implementation was imported.

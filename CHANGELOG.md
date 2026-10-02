@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0 — 2026-10-02
+
+- Add optional same-size SD1.5/SDXL ControlNet Tile img2img workflows, with pinned
+  Hugging Face component revisions, safe checkpoint loading and explicit offline prefetch.
+- Add `refiners`, `download-refiner`, standalone `refine`, and `upscale --refiner`.
+- Keep original upscaler plugins/defaults unchanged; the heavyweight `refine` extra
+  is separate from base, `all` and the published CPU container.
+- Use frozen-input spatial tiles, independent diffusion tile controls and coordinate-derived
+  seeds; report actual denoising steps instead of implying configured steps all execute.
+- Preserve lossless baselines, alpha and protected pixels; add outward mask feathering,
+  explicit blending and optional global RGB mean matching.
+- Add hash-verified resume, per-workflow journals, failure/interruption baseline retention,
+  output collision guards and explicit one-refiner all-model comparisons.
+- Extend stage traces with VAE encode/decode, denoising and compositing; record CUDA
+  allocator peaks when running the native CUDA refinement backend.
+- Add local refiner entry points, offline tests, optional random-weight Diffusers runtime
+  CI, opt-in pretrained smoke tests, and installed-artifact workflow smoke checks.
+- This is the first ControlNet Tile implementation, not MultiDiffusion/shared-latent
+  inference or a SeedVR2/VOSR/SUPIR restoration integration.
+
 ## 0.2.1 — 2026-10-02
 
 - Add opt-in `--trace`, `--trace-file` and `--trace-interval` options for single-image,

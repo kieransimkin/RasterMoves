@@ -166,3 +166,46 @@ checkpoint loader or enables unrestricted pickle loading.
 Additional separately licensed architectures can be enabled with the `extra-arches`
 installation extra plus `--extra-arches`. Review their licences first. Installing that
 extra is not a promise that every OpenModelDB model becomes supported.
+
+
+## Same-size refinement plugins (0.3.0)
+
+The optional diffusion layer is separate from scale-changing model plugins. Do not
+register a multi-component workflow as an ordinary scale=4 checkpoint. The built-in
+`RefinerSpec` records a base pipeline and ControlNet with independent pinned commits
+and licences; its scope is SD1.5/SDXL same-size img2img. Other original-input restoration
+architectures need a future workflow contract rather than pretending to meet this one.
+
+A locally installed extension can expose:
+
+```toml
+[project.entry-points."rastermoves.refiners"]
+my-tile-refiner = "my_package.refiner:create_refiner"
+```
+
+The factory takes no arguments and returns `(spec, backend_factory)` where `spec` is a
+`rastermoves.refinement.RefinerSpec` whose ID exactly matches the entry point. The
+backend constructor accepts `(spec, *, cache_dir, offline, device, precision, offload,
+vae_tiling, scheduler, strict_checksums)`. It must implement:
+
+- `predict(PIL_RGB_tile, *, options: RefineOptions, seed: int) -> (PIL_RGB_tile, dict)`.
+  The output must have exactly the input tile dimensions; record real step counts
+  under `executed_denoising_steps` rather than estimates.
+- `close()` releases persistent runtime/device resources.
+- Optional `inventory`, `device`, `precision` attributes become report metadata.
+
+External packages are explicitly installed by the user, not downloaded as model code.
+`--external-plugins` is required. Built-in names always resolve to built-ins and cannot
+be shadowed. The CLI list/download commands enumerate the two built-in specifications;
+custom installed IDs are selected explicitly with `--refiner ID`. Refiner sessions,
+like upscaler sessions, are not thread-safe. Inference failure is not silently treated
+as no-op success. Native adapter loading uses explicit standard classes, safetensors
+and restricted state dictionaries; custom plugins are trusted local Python and are
+responsible for preserving those guarantees.
+
+The outer refinement layer owns immutable-baseline tiling, masking, alpha, compositing,
+provenance, output collision checks and stage-level resume. Do not generate another
+alpha channel or change dimensions inside `predict`. For deterministic experiments,
+include third-party code identity in its own metadata and start a new comparison
+folder after changing code; package-version fingerprinting cannot hash arbitrary
+external implementations. See [REFINEMENT.md](REFINEMENT.md).

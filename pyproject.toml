@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rastermoves"
-version = "0.2.1"
-description = "Modular AI image upscaling for DanceFlow, with OpenModelDB model plugins and automatic weight downloads"
+version = "0.3.0"
+description = "Modular AI image upscaling and optional generative refinement for DanceFlow, with on-demand model downloads"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "GPL-3.0-only"}
@@ -19,6 +19,7 @@ dependencies = [
 torch = ["torch>=2.6", "torchvision>=0.21", "spandrel>=0.4.2,<0.5", "safetensors>=0.4.5"]
 onnx = ["onnxruntime>=1.20"]
 onnx-gpu = ["onnxruntime-gpu>=1.20"]
+refine = ["torch>=2.6", "diffusers==0.35.2", "transformers>=4.44,<5", "accelerate>=1.0,<2", "safetensors>=0.4.5"]
 trace = ["psutil>=5.9.8,<8"]
 gdrive = ["gdown>=5.2,<6"]
 extra-arches = ["spandrel-extra-arches>=0.2"]
@@ -43,7 +44,7 @@ rastermoves = ["models/*.json", "py.typed"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-markers = ["live: downloads real model weights; enabled only by RASTERMOVES_LIVE=1"]
+markers = ["live: optional pretrained inference; explicitly enabled by RASTERMOVES_LIVE or RASTERMOVES_REFINE_LIVE"]
 
 [tool.ruff]
 line-length = 110
