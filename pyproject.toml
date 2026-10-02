@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rastermoves"
+version = "0.1.1"
+description = "Modular AI image upscaling for DanceFlow, with OpenModelDB model plugins and automatic weight downloads"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "GPL-3.0-only"}
+authors = [{name = "RasterMoves contributors"}]
+dependencies = [
+  "numpy>=1.24,<3", "Pillow>=10.4", "requests>=2.32.3",
+  "filelock>=3.15", "platformdirs>=4.2", "huggingface-hub>=0.27,<3",
+]
+
+[project.optional-dependencies]
+torch = ["torch>=2.6", "torchvision>=0.21", "spandrel>=0.4.2,<0.5", "safetensors>=0.4.5"]
+onnx = ["onnxruntime>=1.20"]
+onnx-gpu = ["onnxruntime-gpu>=1.20"]
+gdrive = ["gdown>=5.2,<6"]
+extra-arches = ["spandrel-extra-arches>=0.2"]
+all = ["torch>=2.6", "torchvision>=0.21", "spandrel>=0.4.2,<0.5", "safetensors>=0.4.5", "onnxruntime>=1.20", "gdown>=5.2,<6"]
+dev = ["pytest>=8", "build>=1.2", "ruff>=0.9"]
+
+[project.scripts]
+rastermoves = "rastermoves.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rastermoves = ["models/*.json", "py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["live: downloads real model weights; enabled only by RASTERMOVES_LIVE=1"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"

@@ -1,0 +1,27 @@
+{
+  "id": "4x-SPANkendata",
+  "name": "SPANkendata",
+  "architecture": "span",
+  "scale": 4,
+  "author": "crustaceous-d",
+  "license": "CC-BY-SA-4.0",
+  "tags": [
+    "general-upscaler",
+    "photo"
+  ],
+  "description": "SPAN upscaler for undegraded photographs; this catalogue entry offers ONNX weights.",
+  "resources": [
+    {
+      "format": "onnx",
+      "backend": "onnx",
+      "size": 1718947,
+      "sha256": "7478c40953a5902efd785ef1fe8e07a8bb7e7ee9b1977273550813ceefae6348",
+      "urls": [
+        "https://raw.githubusercontent.com/terrainer/AI-Upscaling-Models/main/4xSPANkendata/4xSPANkendata_fp32.onnx"
+      ]
+    }
+  ],
+  "source_page": "https://openmodeldb.info/models/4x-SPANkendata",
+  "input_channels": 3,
+  "output_channels": 3
+}

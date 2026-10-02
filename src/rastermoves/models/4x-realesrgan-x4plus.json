@@ -1,0 +1,29 @@
+{
+  "id": "4x-realesrgan-x4plus",
+  "name": "RealESRGAN_x4Plus",
+  "architecture": "esrgan",
+  "scale": 4,
+  "author": "xinntao",
+  "license": "BSD-3-Clause",
+  "tags": [
+    "general-upscaler",
+    "photo",
+    "jpeg",
+    "restoration"
+  ],
+  "description": "General image restoration with an RRDB/ESRGAN network.",
+  "resources": [
+    {
+      "format": "pth",
+      "backend": "spandrel",
+      "size": 67040989,
+      "sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
+      "urls": [
+        "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
+      ]
+    }
+  ],
+  "source_page": "https://openmodeldb.info/models/4x-realesrgan-x4plus",
+  "input_channels": 3,
+  "output_channels": 3
+}

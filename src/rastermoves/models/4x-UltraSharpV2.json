@@ -1,0 +1,40 @@
+{
+  "id": "4x-UltraSharpV2",
+  "name": "UltraSharpV2",
+  "architecture": "dat",
+  "scale": 4,
+  "author": "kim2091",
+  "license": "CC-BY-NC-SA-4.0",
+  "tags": [
+    "ai-generated",
+    "anime",
+    "general-upscaler",
+    "photo",
+    "text",
+    "restoration"
+  ],
+  "description": "DAT2-based general-purpose model with PyTorch safetensors and ONNX exports. Non-commercial licence.",
+  "resources": [
+    {
+      "format": "safetensors",
+      "backend": "spandrel",
+      "size": 139792588,
+      "sha256": "2b5db674aa8f3864a696dccd1d07d7cc0500fbf220f35044cd30eee9a7f971a7",
+      "urls": [
+        "https://huggingface.co/Kim2091/UltraSharpV2/resolve/main/4x-UltraSharpV2.safetensors?download=true"
+      ]
+    },
+    {
+      "format": "onnx",
+      "backend": "onnx",
+      "size": 51800517,
+      "sha256": "6c0201e3403745f39a9aa5273c50ed084cf6c4af5a71a4654c30252cf19bf0a5",
+      "urls": [
+        "https://huggingface.co/Kim2091/UltraSharpV2/blob/main/4x-UltraSharpV2_fp32_op17.onnx"
+      ]
+    }
+  ],
+  "source_page": "https://openmodeldb.info/models/4x-UltraSharpV2",
+  "input_channels": 3,
+  "output_channels": 3
+}

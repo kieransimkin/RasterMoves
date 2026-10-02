@@ -1,0 +1,29 @@
+{
+  "id": "4x-realesr-general-x4v3",
+  "name": "RealESR General x4 v3",
+  "architecture": "compact",
+  "scale": 4,
+  "author": "xinntao",
+  "license": "BSD-3-Clause",
+  "tags": [
+    "general-upscaler",
+    "photo",
+    "jpeg",
+    "restoration"
+  ],
+  "description": "Small general-scene Real-ESRGAN model.",
+  "resources": [
+    {
+      "format": "pth",
+      "backend": "spandrel",
+      "size": 4885111,
+      "sha256": "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292",
+      "urls": [
+        "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
+      ]
+    }
+  ],
+  "source_page": "https://openmodeldb.info/models/4x-realesr-general-x4v3",
+  "input_channels": 3,
+  "output_channels": 3
+}

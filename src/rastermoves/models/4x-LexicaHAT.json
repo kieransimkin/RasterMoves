@@ -1,0 +1,26 @@
+{
+  "id": "4x-LexicaHAT",
+  "name": "4xLexicaHAT",
+  "architecture": "hat",
+  "scale": 4,
+  "author": "helaman",
+  "license": "CC-BY-4.0",
+  "tags": [
+    "ai-generated"
+  ],
+  "description": "HAT upscaler trained on AI-generated imagery.",
+  "resources": [
+    {
+      "format": "pth",
+      "backend": "spandrel",
+      "size": 85149569,
+      "sha256": "f3441f602f221ae111253b72ccb561e9f7a1a3dc84ab27923edea0a9581ea1dd",
+      "urls": [
+        "https://github.com/Phhofm/models/raw/main/4xLexicaHAT/4xLexicaHAT.pth"
+      ]
+    }
+  ],
+  "source_page": "https://openmodeldb.info/models/4x-LexicaHAT",
+  "input_channels": 3,
+  "output_channels": 3
+}

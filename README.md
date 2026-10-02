@@ -1,0 +1,293 @@
+# RasterMoves
+
+A modular Python CLI and library for **local image upscaling with OpenModelDB models**.
+Each model is an independent plugin, normally a small JSON manifest. Shared PyTorch/Spandrel
+and ONNX Runtime backends handle architecture loading and inference. Weights are fetched
+from the model's recorded sources only when needed, verified, and cached for later use.
+
+**Release:** 0.1.1, source and wheel distributions. This project has not been published to PyPI.
+It is an independent implementation, not an official OpenModelDB product.
+
+## Part of DanceFlow
+
+**RasterMoves** is the image-upscaling and enhancement component of the DanceFlow
+family, alongside **KeywordMoves**, **StemLab**, **DanceMoves**, and **DanceRudiments**.
+It runs as a standalone Python library or command-line tool; it does not require those
+other components to be installed. The package, Python import, and executable all use
+`rastermoves`.
+
+This release renames the original UpscaleLab package. See the
+[migration guide](docs/MIGRATION.md) for import, command, plugin, environment-variable,
+and existing-cache changes, and the [changelog](CHANGELOG.md) for release details.
+
+## Install
+
+Python 3.10 or newer is required; Python 3.11 or 3.12 is a practical choice for broad
+runtime wheel availability. Extract the source archive and run these commands inside
+its `rastermoves` directory:
+
+```bash
+python -m venv .venv
+# Linux / macOS:
+source .venv/bin/activate
+# Windows PowerShell, instead:
+# .venv\Scripts\Activate.ps1
+
+python -m pip install --upgrade pip
+python -m pip install -e ".[torch,onnx,gdrive]"
+rastermoves --version
+rastermoves doctor
+```
+
+This installs the two inference backends and optional Google Drive downloader. For a
+smaller installation, choose only the required extras:
+
+```bash
+python -m pip install -e ".[torch]"        # PyTorch / Spandrel
+python -m pip install -e ".[onnx]"         # ONNX Runtime CPU, without PyTorch
+python -m pip install -e .                # Catalogue and downloads only
+```
+
+For NVIDIA acceleration, first install matching PyTorch and torchvision builds using
+the [official PyTorch installer](https://pytorch.org/get-started/locally/), then install
+this project's `torch` extra. The ONNX CUDA alternative is `.[onnx-gpu]`; **do not
+install `onnxruntime` and `onnxruntime-gpu` together**. CUDA/cuDNN compatibility is governed
+by the chosen runtime. PyTorch also supports Apple MPS when that device is available.
+`doctor` reports the runtimes and devices it can actually discover.
+
+Dependencies have compatibility floors, not a lockfile. Keep inference dependencies
+updated, especially PyTorch. The core local tests were run on Python 3.13.5; that does
+not imply all optional third-party runtimes were installed or tested on that version.
+
+## First upscale
+
+```bash
+rastermoves upscale input.png -o output.png
+```
+
+The default plugin is `4x-realesr-general-x4v3`. The first run fetches its weights;
+subsequent runs use the verified cache. Images are processed locally and are not
+uploaded to the model host. By default, inference is FP32 and automatically selects
+CUDA, then MPS, then CPU for PyTorch; ONNX selects CUDA when available, otherwise CPU.
+
+```bash
+# Explicit model and CUDA device; save a provenance sidecar
+rastermoves upscale input.png -o output.png -m 4x-realesrgan-x4plus --device cuda --report
+
+# A Hugging Face-hosted model (review its non-commercial licence)
+rastermoves upscale input.png -o sharp.png -m 4x-UltraSharpV2
+
+# An ONNX-only starter model
+rastermoves upscale input.png -o span.png -m 4x-SPANkendata --backend onnx --device cpu
+
+# Resize to a particular width AFTER the native neural upscale
+rastermoves upscale cover.png -o cover-3000.png --width 3000
+
+# Batch processing, including subdirectories; retain transparency in PNG output
+rastermoves upscale ./originals -o ./upscaled --recursive --report
+```
+
+`--scale`, `--width`, `--height`, and `--long-edge` specify the final size while preserving
+aspect ratio. Only one may be selected. The neural model still runs at its native
+integer scale; a final Lanczos resize produces the requested size. Targets larger
+than native scale emit a warning: the extra enlargement is not another neural pass.
+
+## Model plugins and the OpenModelDB catalogue
+
+Eight independently addressable manifests are bundled. No weights are included.
+The licence and source details below were transcribed from OpenModelDB; consult the
+linked record and original author before using or redistributing a model.
+
+| Plugin ID | Native scale | Architecture / format | Recorded model licence |
+| --- | --- | --- | --- |
+| [4x-realesr-general-x4v3](https://openmodeldb.info/models/4x-realesr-general-x4v3) | 4x | Compact / PTH | BSD-3-Clause |
+| [4x-realesr-animevideo-v3](https://openmodeldb.info/models/4x-realesr-animevideo-v3) | 4x | Compact / PTH | BSD-3-Clause |
+| [4x-realesrgan-x4plus](https://openmodeldb.info/models/4x-realesrgan-x4plus) | 4x | ESRGAN / PTH | BSD-3-Clause |
+| [4x-UltraSharpV2](https://openmodeldb.info/models/4x-UltraSharpV2) | 4x | DAT / safetensors, ONNX | CC-BY-NC-SA-4.0 |
+| [4x-Remacri](https://openmodeldb.info/models/4x-Remacri) | 4x | ESRGAN / PTH | CC-BY-NC-SA-4.0 |
+| [4x-SPANkendata](https://openmodeldb.info/models/4x-SPANkendata) | 4x | SPAN / ONNX | CC-BY-SA-4.0 |
+| [4x-LexicaHAT](https://openmodeldb.info/models/4x-LexicaHAT) | 4x | HAT / PTH | CC-BY-4.0 |
+| [2x-NomosUni-span-multijpg](https://openmodeldb.info/models/2x-NomosUni-span-multijpg) | 2x | SPAN / PTH, Google Drive | CC-BY-4.0 |
+
+```bash
+rastermoves models
+rastermoves models --tag photo
+rastermoves models --architecture span --scale 2
+rastermoves info 4x-UltraSharpV2
+
+# Import the current catalogue metadata, not every model's weights
+rastermoves sync
+rastermoves models --json > catalogue.json
+```
+
+`sync` consumes OpenModelDB's exported JSON catalogue, with its official repository
+archive as a fallback. Every valid model entry becomes a separate data-driven plugin.
+The importer retains its architecture, channels, native scale, tags, source URLs,
+formats, byte sizes, and checksums. Unsupported formats remain visible rather than
+being mislabeled as runnable. The catalogue endpoint and remote downloads were not exercised in this release
+validation; local schema and fallback fixtures were tested.
+
+For an unbundled model, pass the exact OpenModelDB ID or model-page URL. It is fetched
+individually on first use, without requiring a full sync:
+
+```bash
+rastermoves info https://openmodeldb.info/models/4x-LexicaHAT
+rastermoves upscale input.png -o output.png -m https://openmodeldb.info/models/4x-LexicaHAT
+
+# Import from a local OpenModelDB checkout, useful offline or with a pinned revision
+rastermoves sync --source /path/to/open-model-database/data/models --offline
+```
+
+**Catalogue coverage is not universal inference compatibility.** A model must have a
+supported resource, a working source, and an architecture understood by the installed
+backend. New architectures, unsupported hosts, face-alignment workflows, multi-input
+models, video models, and archive-only packages can require an additional plugin.
+No remote repository Python code is loaded or installed automatically.
+
+## Downloads, verification and offline use
+
+Hugging Face sources use `huggingface_hub.hf_hub_download`. Other supported sources
+include GitHub releases/raw files and ordinary HTTPS file links. Individual Google
+Drive file links use the optional `gdrive` extra. Listed mirrors are tried in order
+of provider preference: Hugging Face, direct HTTPS, then Google Drive. It does not
+search for similarly named models and silently substitute third-party weights.
+
+```bash
+rastermoves download 4x-realesr-general-x4v3 --strict-checksums
+rastermoves upscale input.png -o output.png --offline
+
+# Global flags go BEFORE the subcommand
+rastermoves --cache-dir ./model-cache download 4x-UltraSharpV2 --backend spandrel
+rastermoves --cache-dir ./model-cache upscale input.png -o output.png -m 4x-UltraSharpV2 --offline
+```
+
+Defaults use platform-specific user cache/config directories. `RASTERMOVES_CACHE`
+overrides the cache; `RASTERMOVES_OFFLINE=1` disables network use through the tool.
+The cache contains `weights`, `huggingface`, `catalog.json`, and `imported-models` as
+needed. Hugging Face's own cache and the verified weight copy can consume duplicate
+disk space. Once the verified copy exists, inference needs only that copy.
+
+A publisher SHA-256, when supplied, is checked on every cache use. Files without a
+publisher checksum get a local integrity receipt, which detects later corruption
+but does not authenticate their origin. `--strict-checksums` rejects those files.
+Partial or failed downloads are not published as complete cached weights; file locks
+protect concurrent writes. The tool rejects HTML error pages and Git LFS pointers.
+A checksum mismatch is an error, not permission to use the changed file.
+
+Use `HF_TOKEN` for a Hugging Face account when necessary. The token is handled by the
+Hub library, never attached to arbitrary HTTP model sources. Public models usually
+do not require an account. Gated models may require accepting their terms first.
+
+Mega links, pCloud share pages, Drive folders, and compressed archive resources are
+not automatically resolved. Download those manually through their normal provider,
+then use a local file:
+
+```bash
+rastermoves upscale input.png -o output.png --model-file /path/to/model.safetensors
+rastermoves upscale input.png -o output.png --model-file /path/to/model.onnx --native-scale 4
+```
+
+Adding `-m MODEL_ID` to a local-file run verifies matching manifest checksums and
+metadata when available. Standalone local ONNX defaults to RGB NCHW; nonstandard
+layout/channel contracts need a manifest. TorchScript is deliberately unsupported.
+
+## Memory, tiling and image handling
+
+```bash
+# Smaller tiles to reduce inference VRAM requirements
+rastermoves upscale input.png -o output.png --tile 128 --overlap 24 --tile-pad 16
+
+# Whole-image inference, when memory permits
+rastermoves upscale input.png -o output.png --tile 0
+
+# CUDA half precision only for PyTorch models that explicitly support it
+rastermoves upscale input.png -o output.png --device cuda --precision fp16
+```
+
+Tiles overlap and are feather-blended, with an additional context halo to reduce
+boundary artifacts. Sizes are in input-image pixels. Overlap must be smaller than
+the tile size. Spandrel's descriptor handles model-specific input padding and cropping;
+ONNX constraints can be supplied in a manifest. GPU out-of-memory failures during
+supported tiled inference trigger smaller-tile retries. Model loading failures and
+host RAM exhaustion do not receive that recovery.
+
+Global-context models can behave differently on tiles. The tool respects a Spandrel
+model's discouraged/internal tiling guidance and runs a whole-image pass unless
+`--force-tiling` is supplied. That override may trade image consistency for lower VRAM.
+There is no promise that feathering eliminates every neural-model boundary artifact.
+
+Tiling limits inference VRAM, **not total output RAM**. Native-scale results are
+accumulated in host memory before final resizing. The default native AND final output
+limit is 64 megapixels; increase `--max-output-mp` only with sufficient memory. A
+3000x3000 input at 4x produces a 144-megapixel intermediate even when the final target
+is 3000 pixels wide, so it exceeds the default limit. The float RGB accumulation
+buffer plus weights alone uses about 16 bytes per native output pixel, before other
+arrays, inference workspaces and encoded output.
+
+Input PNG, JPEG, WebP, BMP and TIFF are supported via Pillow. Output supports PNG,
+lossless WebP, JPEG quality 95 and TIFF. The pipeline applies EXIF orientation and
+converts embedded profiles to sRGB. Alpha is handled separately using Lanczos by
+default; `--alpha model` sends the alpha channel through the model too. Transparent
+JPEG output is rejected rather than silently flattened. Input files are never
+replaced in place; overwriting an existing destination requires `--overwrite`.
+
+This version is an **8-bit still-image tool**. HDR/high-bit-depth input, animated
+images and multi-page inputs are rejected. EXIF metadata is intentionally not copied:
+orientation has been applied and stale dimensions/GPS fields are omitted. Neural
+upscaling can invent or alter detail; it is not forensic reconstruction.
+
+## Python API
+
+```python
+from rastermoves import Upscaler
+
+with Upscaler("4x-realesr-general-x4v3", device="auto") as upscaler:
+    upscaler.upscale_file(
+        "input.png", "output.png",
+        tile=256, overlap=32, tile_pad=16,
+        report=True,
+    )
+    print(upscaler.last_report)
+```
+
+The same session can process many images without reloading the model. `upscale_image`
+accepts and returns a Pillow image. Sessions are not thread-safe; use separate sessions
+or external serialization. See `examples/batch_api.py` and [the plugin guide](docs/PLUGINS.md).
+
+## Validation and development
+
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest -q
+
+# Download and run two actual small models: requires both runtimes and network access
+python -m pip install -e ".[torch,onnx,dev]"
+# Linux / macOS:
+RASTERMOVES_LIVE=1 python -m pytest -q tests/test_live.py
+# Windows PowerShell, instead:
+# $env:RASTERMOVES_LIVE = "1"
+# python -m pytest -q tests/test_live.py
+```
+
+The supplied local verification covers cache integrity, catalogue parsing, safe
+checkpoint loading, image processing, tiled inference, backend contracts and CLI
+behavior. **Real pretrained-model smoke tests were not run in the build environment**,
+where the Spandrel and ONNX runtimes are not installed. This rename validation
+did not download weights or attempt live pretrained inference.
+See [TESTING.md](docs/TESTING.md) for the exact results and distinctions between real
+PyTorch operations, stubbed adapters, and unrun live integrations.
+
+```bash
+python -m build
+```
+
+A GitHub Actions workflow is included for offline tests and an opt-in manual live
+smoke-test job. No repository was created and no release was published automatically.
+
+## Licence and references
+
+Project source: GPL-3.0-only. Model weights retain their own licences and are not
+included or relicensed. In particular, UltraSharpV2 and Remacri are recorded as
+non-commercial models. A model being downloadable does not grant commercial rights.
+Review the creator's terms separately. See `LICENSE`, `THIRD_PARTY_NOTICES.md`,
+[SECURITY.md](docs/SECURITY.md), and [SOURCES.md](docs/SOURCES.md).

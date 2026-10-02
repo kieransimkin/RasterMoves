@@ -1,0 +1,7 @@
+include README.md CHANGELOG.md LICENSE THIRD_PARTY_NOTICES.md
+recursive-include docs *.md
+recursive-include examples *.py *.json
+recursive-include tests *.py
+recursive-include src/rastermoves/models *.json
+include src/rastermoves/py.typed
+include .github/workflows/tests.yml

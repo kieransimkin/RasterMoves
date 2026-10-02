@@ -1,0 +1,28 @@
+{
+  "id": "4x-realesr-animevideo-v3",
+  "name": "RealESR AnimeVideo v3",
+  "architecture": "compact",
+  "scale": 4,
+  "author": "xinntao",
+  "license": "BSD-3-Clause",
+  "tags": [
+    "anime",
+    "cartoon",
+    "restoration"
+  ],
+  "description": "Small anime/video model; this tool processes individual still frames.",
+  "resources": [
+    {
+      "format": "pth",
+      "backend": "spandrel",
+      "size": 2504012,
+      "sha256": "b8a8376811077954d82ca3fcf476f1ac3da3e8a68a4f4d71363008000a18b75d",
+      "urls": [
+        "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth"
+      ]
+    }
+  ],
+  "source_page": "https://openmodeldb.info/models/4x-realesr-animevideo-v3",
+  "input_channels": 3,
+  "output_channels": 3
+}
