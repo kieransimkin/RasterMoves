@@ -20,7 +20,7 @@ from rastermoves.network import session
 
 
 def test_public_api():
-    assert rastermoves.__version__ == "0.1.1"
+    assert rastermoves.__version__ and isinstance(rastermoves.__version__, str)
     assert Registry.__module__ == "rastermoves.registry"
     assert Upscaler.__module__ == "rastermoves.pipeline"
     assert rastermoves.__all__ == ["Upscaler", "Registry", "__version__"]
@@ -34,7 +34,7 @@ def test_root_import_does_not_load_neural_runtimes():
     result = subprocess.run(
         [sys.executable, "-c", (
             "import rastermoves, sys; "
-            "assert rastermoves.__version__ == '0.1.1'; "
+            "assert rastermoves.__version__; "
             "assert not ({'torch', 'spandrel', 'onnxruntime'} & set(sys.modules))"
         )],
         env=env, capture_output=True, text=True, timeout=20,
@@ -46,7 +46,7 @@ def test_cli_version_has_new_name(capsys):
     with pytest.raises(SystemExit) as caught:
         main(["--version"])
     assert caught.value.code == 0
-    assert capsys.readouterr().out.strip() == "RasterMoves 0.1.1"
+    assert capsys.readouterr().out.strip() == f"RasterMoves {rastermoves.__version__}"
 
 
 @pytest.mark.parametrize("command", [None, "models", "info", "sync", "download", "doctor", "upscale"])

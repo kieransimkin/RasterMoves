@@ -1,3 +1,55 @@
+# RasterMoves 0.2.0 validation
+
+Base repository: `kieransimkin/RasterMoves`, commit
+`dd1d61afc582d23c2108b72bea1e9686e555b9f3`, checked on 2026-10-02.
+The local baseline's complete Git tree matches upstream exactly:
+`fc023effd330fa26eb87eb1169e29cb55c7b1083`.
+
+## Local results
+
+- **180 tests passed, 2 optional live-model tests skipped**, Python 3.13.5 on Linux.
+- All-model CLI → sweep → actual image pipeline/tiler/output-writer integration tested
+  across all eight starter IDs using a deterministic substitute model (not pretrained
+  neural-network quality testing). RGBA and native-scale output dimensions verified.
+- Failure isolation, cleanup, Ctrl+C handling, incremental summaries, resume checksum
+  verification, corrupt/missing results, changed input/settings/model manifests,
+  new models, output collisions, folder locking and registry-snapshot reuse tested.
+- Tag/version validation, prerelease classification, optional untagged TestPyPI
+  rehearsals, lowercase container names, exact-tag commit checks, distributable
+  metadata/data validation and reproducible source-archive normalization tested.
+- Workflow YAML parsed; job dependencies, publishing gates, least-privilege settings,
+  exact Action SHA pins and shell-script syntax tested. This is not a GitHub-hosted
+  workflow execution or an actionlint run.
+- Wheel and source distribution built locally using the installed setuptools backend;
+  metadata and bundled model/typing/release files checked. Their package installations
+  and CLI smoke checks run outside the source checkout, reusing preinstalled third-party
+  dependencies because this environment cannot fetch new packages. CI uses fresh venvs
+  and performs ordinary dependency installation plus strict Twine checks.
+- Patch application checked against a clean worktree of the exact upstream commit;
+  tests also run from that patched worktree.
+
+## Not executed here
+
+No GitHub-hosted workflow, real PyPI/TestPyPI upload, GitHub release creation,
+Docker/GHCR/Docker Hub build/push or end-to-end pretrained-model upscale was performed.
+Docker, actionlint, the build frontend, Twine, Spandrel and ONNX Runtime are not available
+in this execution environment; the installed setuptools backend is used for local
+package builds. Tests that exercise backend interfaces use substitutes as described
+above and in the original test notes. PyTorch synthetic-checkpoint tests do run locally.
+
+The workflows include fresh installation, strict Twine validation, optional-runtime
+checks and a network-disabled container smoke test before pushing. The two live-model
+tests require explicit opt-in (`RASTERMOVES_LIVE=1`) and real downloads/runtimes. A
+catalogue entry is not a promise that its checkpoint is supported by installed runtimes.
+
+Use **Re-run failed jobs** after fixing publisher configuration; do not treat a skipped
+optional publication job as a successful upload. The patch and release tooling do not
+reserve package names or change account/environment settings.
+
+---
+
+## Historical 0.1.1 validation notes
+
 # RasterMoves validation record — 0.1.1
 
 Date: 2026-10-02. These are observed results from the rename build, not claims about

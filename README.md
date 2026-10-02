@@ -5,7 +5,8 @@ Each model is an independent plugin, normally a small JSON manifest. Shared PyTo
 and ONNX Runtime backends handle architecture loading and inference. Weights are fetched
 from the model's recorded sources only when needed, verified, and cached for later use.
 
-**Release:** 0.1.1, source and wheel distributions. This project has not been published to PyPI.
+**Version:** 0.2.0. Distribution name: `rastermoves`. See [release setup](docs/RELEASING.md)
+for PyPI, TestPyPI, GitHub Releases and container publishing.
 It is an independent implementation, not an official OpenModelDB product.
 
 ## Part of DanceFlow
@@ -16,7 +17,7 @@ It runs as a standalone Python library or command-line tool; it does not require
 other components to be installed. The package, Python import, and executable all use
 `rastermoves`.
 
-This release renames the original UpscaleLab package. See the
+Version 0.1.1 renamed the original UpscaleLab package. See the
 [migration guide](docs/MIGRATION.md) for import, command, plugin, environment-variable,
 and existing-cache changes, and the [changelog](CHANGELOG.md) for release details.
 
@@ -58,6 +59,39 @@ by the chosen runtime. PyTorch also supports Apple MPS when that device is avail
 Dependencies have compatibility floors, not a lockfile. Keep inference dependencies
 updated, especially PyTorch. The core local tests were run on Python 3.13.5; that does
 not imply all optional third-party runtimes were installed or tested on that version.
+
+## Compare every model
+
+```bash
+# All registered models: bundled, previously synced, and your custom plugins.
+rastermoves upscale input.png --all-models -o comparison
+
+# Refresh the full OpenModelDB catalogue first, then attempt every entry.
+rastermoves upscale input.png --all-models --sync-models -o full-comparison
+
+# Inspect the planned models, licences and filenames without downloading weights.
+rastermoves upscale input.png --all-models --sync-models --dry-run -o full-comparison
+
+# Retry failures/interrupted models; reuse only checksum-verified matching results.
+rastermoves upscale input.png --all-models --resume -o full-comparison
+```
+
+Each model runs sequentially and is released before the next one. Successful models
+produce `model-MODEL_ID.png` and a provenance sidecar. `summary.json` records every
+selected model's success, failure or interruption and is updated as the run proceeds.
+Failures do not stop later models; the command exits **1** if any model fails, **130**
+on Ctrl+C, or **0** when all models succeed or are reused.
+
+`--all-models` by itself does **not** refresh metadata or secretly download the entire
+remote catalogue. Add `--sync-models` (or run `rastermoves sync`) for that. A fresh
+installation knows eight model plugins. Full-catalogue comparisons can download many
+large checkpoints. Catalogue membership is not a guarantee of runtime compatibility:
+unsupported architectures, unavailable hosts and missing runtimes are recorded as
+failures, not presented as successful results. Each model's licence still applies.
+
+Use a new output folder, `--resume`, or `--overwrite` explicitly. Standard tile,
+precision, device, final-size, format, alpha, offline and checksum options also apply.
+See [all-model comparisons](docs/ALL_MODELS.md) for details and resume boundaries.
 
 ## First upscale
 
@@ -291,3 +325,30 @@ included or relicensed. In particular, UltraSharpV2 and Remacri are recorded as
 non-commercial models. A model being downloadable does not grant commercial rights.
 Review the creator's terms separately. See `LICENSE`, `THIRD_PARTY_NOTICES.md`,
 [SECURITY.md](docs/SECURITY.md), and [SOURCES.md](docs/SOURCES.md).
+
+## Automated releases and containers
+
+The [Release workflow](.github/workflows/release.yml) tests the tagged source, builds
+and validates its wheel/source distribution, then publishes to **PyPI**, **GitHub
+Releases**, and **GHCR**. **TestPyPI** and a **Docker Hub** mirror are optional.
+Configure Trusted Publishing once, then push a tag matching both version declarations:
+
+```bash
+git tag -a v0.2.0 -m "RasterMoves 0.2.0"
+git push origin v0.2.0
+```
+
+Production uploads do not run on ordinary branch pushes or pull requests. The
+repository must contain the workflow at the tagged commit. See
+[RELEASING.md](docs/RELEASING.md) for exact setup fields, first-release instructions,
+TestPyPI rehearsals, failure recovery, and Docker commands. Neither the wheel nor the
+container includes pretrained weights; they download on demand. The supplied
+`linux/amd64` container includes CPU PyTorch/Spandrel and ONNX Runtime; GPU use remains
+available through the native Python installation.
+
+After a successful production publication:
+
+```bash
+python -m pip install "rastermoves[all]"
+docker run --rm ghcr.io/kieransimkin/rastermoves:0.2.0 --version
+```

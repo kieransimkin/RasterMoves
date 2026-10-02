@@ -45,8 +45,14 @@ def parser():
     up = commands.add_parser("upscale", help="Upscale one image or a directory; weights are downloaded on first use.")
     up.add_argument("input", type=Path)
     up.add_argument("-o", "--output", type=Path)
-    up.add_argument("-m", "--model", help=f"Model ID or OpenModelDB page; default {DEFAULT_MODEL}.")
+    selection = up.add_mutually_exclusive_group()
+    selection.add_argument("-m", "--model", help=f"Model ID or OpenModelDB page; default {DEFAULT_MODEL}.")
+    selection.add_argument("--all-models", action="store_true", help="Try every registered model on one image; -o must name a folder.")
+    # --model + --model-file is intentionally supported for checksum validation.
     up.add_argument("--model-file", type=Path, help="Use a local state-dict/safetensors/ONNX model.")
+    up.add_argument("--sync-models", action="store_true", help="With --all-models, refresh the full OpenModelDB catalogue first (metadata only).")
+    up.add_argument("--dry-run", action="store_true", help="With --all-models, print the model/output plan without downloading weights.")
+    up.add_argument("--resume", action="store_true", help="With --all-models, reuse verified successes and retry failed/interrupted models.")
     up.add_argument("--native-scale", type=int, help="Required for a standalone local ONNX file.")
     up.add_argument("--backend", default="auto", help="auto, spandrel, onnx, or an external backend name.")
     up.add_argument("--device", default="auto", help="auto, cpu, cuda, cuda:N; also mps with PyTorch.")
@@ -126,6 +132,53 @@ def batch_jobs(source: Path, output: Path | None, *, recursive=False, format="pn
     return result
 
 
+def _all_models(args) -> int:
+    from .sweep import output_name, run_all_models
+    if args.model_file or args.native_scale is not None or args.recursive:
+        raise UpscaleError("--all-models cannot be combined with --model-file, --native-scale or --recursive.")
+    if args.output is None:
+        raise UpscaleError("--all-models requires -o/--output with a named output folder.")
+    if not args.input.is_file():
+        raise UpscaleError("--all-models requires one input image file, not a directory.")
+    if args.output.exists() and not args.output.is_dir():
+        raise UpscaleError("--all-models output must be a named directory, not a file.")
+    if args.resume and args.overwrite:
+        raise UpscaleError("Choose --resume or --overwrite, not both.")
+    offline = Downloader(args.cache_dir, offline=args.offline).offline
+    if args.sync_models:
+        if offline:
+            raise UpscaleError("--sync-models requires network access; omit it to use the cached catalogue offline.")
+        print("Refreshing OpenModelDB metadata (no weights yet)...", file=sys.stderr)
+        sync_catalog(cache_dir(args.cache_dir))
+    registry = _registry(args)
+    specs = registry.search()
+    print(f"Selected {len(specs)} model plugins. Weights download as needed; the full catalogue can use substantial disk space.", file=sys.stderr)
+    if args.dry_run:
+        print(json.dumps({"dry_run": True, "input": str(args.input), "output_directory": str(args.output),
+                          "model_count": len(specs), "models": [
+                              {"id": s.id, "license": s.license, "native_scale": s.scale,
+                               "output": str(args.output / output_name(s, args.format)),
+                               "resource_sizes_bytes": [r.size for r in s.resources]} for s in specs]}, indent=2))
+        return 0
+    sessions = {"cache_dir": args.cache_dir, "device": args.device, "backend": args.backend,
+                "precision": args.precision, "offline": offline, "strict_checksums": args.strict_checksums,
+                "extra_arches": args.extra_arches, "model_dirs": args.plugin_dir, "external_plugins": args.external_plugins}
+    options = {key: getattr(args, key) for key in (
+        "tile", "overlap", "tile_pad", "scale", "width", "height", "long_edge", "alpha", "max_output_mp", "force_tiling")}
+    def progress(index, total, model, status):
+        print(f"[{index}/{total}] {model}: {status}", file=sys.stderr)
+    summary = run_all_models(args.input, args.output, specs, session_options=sessions,
+                             image_options=options, format=args.format, registry=registry, overwrite=args.overwrite,
+                             resume=args.resume, progress=progress)
+    for row in summary["results"]:
+        if row["status"] in {"success", "reused"}:
+            print(Path(summary["output_directory"]) / row["output"])
+        else:
+            print(f"ERROR: {row['model_id']}: {row.get('error', row.get('cleanup_error', row['status']))}", file=sys.stderr)
+    print(f"Summary: {Path(summary['output_directory']) / 'summary.json'}", file=sys.stderr)
+    return 1 if summary["counts"]["failed"] else 0
+
+
 def run(args) -> int:
     if args.command == "doctor":
         print(json.dumps(_doctor(), indent=2))
@@ -163,6 +216,10 @@ def run(args) -> int:
                 errors.append(str(e))
         raise UpscaleError("No model resource downloaded. " + "; ".join(errors))
     elif args.command == "upscale":
+        if args.all_models:
+            return _all_models(args)
+        if args.sync_models or args.dry_run or args.resume:
+            raise UpscaleError("--sync-models, --dry-run and --resume require --all-models.")
         jobs = batch_jobs(args.input, args.output, recursive=args.recursive, format=args.format)
         failures = 0
         with Upscaler(args.model, model_file=args.model_file, native_scale=args.native_scale, cache_dir=args.cache_dir,

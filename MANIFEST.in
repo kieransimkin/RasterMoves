@@ -4,4 +4,6 @@ recursive-include examples *.py *.json
 recursive-include tests *.py
 recursive-include src/rastermoves/models *.json
 include src/rastermoves/py.typed
-include .github/workflows/tests.yml
+recursive-include .github *.yml
+recursive-include scripts *.py
+include Dockerfile .dockerignore

@@ -97,9 +97,10 @@ class Upscaler:
     """
     def __init__(self, model: str | None = None, *, model_file=None, native_scale=None, cache_dir=None,
                  device="auto", backend="auto", precision="fp32", offline=False, strict_checksums=False,
-                 extra_arches=False, model_dirs=(), external_plugins=False):
+                 extra_arches=False, model_dirs=(), external_plugins=False, registry: Registry | None = None):
         self.downloader = Downloader(cache_dir, offline=offline, strict_checksums=strict_checksums)
-        self.registry = Registry(self.downloader.root, model_dirs=model_dirs, external_plugins=external_plugins)
+        self.registry = registry if registry is not None else Registry(
+            self.downloader.root, model_dirs=model_dirs, external_plugins=external_plugins)
         self.device, self.backend, self.precision = device, backend, precision
         self.extra_arches, self.external_plugins = extra_arches, external_plugins
         self.local_file = Path(model_file).expanduser() if model_file else None
