@@ -56,6 +56,25 @@ install `onnxruntime` and `onnxruntime-gpu` together**. CUDA/cuDNN compatibility
 by the chosen runtime. PyTorch also supports Apple MPS when that device is available.
 `doctor` reports the runtimes and devices it can actually discover.
 
+For a complete NVIDIA development environment after installing the matching CUDA
+PyTorch build, install every compatible optional feature explicitly. This uses the GPU
+ONNX runtime instead of the conflicting CPU package:
+
+```powershell
+python -m pip install -e ".[torch,onnx-gpu,refine,trace,gdrive,extra-arches,dev]"
+python -m pip check
+rastermoves doctor
+python -m pytest -q
+```
+
+This path was verified on 3 October 2026 with Python 3.13.14, PyTorch
+2.14.1+cu126, torchvision 0.29.1+cu126, ONNX Runtime GPU 1.30.0,
+Diffusers 0.35.2 and an NVIDIA RTX 4060 Ti. `doctor` found CUDA through PyTorch
+and TensorRT/CUDA/CPU ONNX providers; the local suite passed 347 tests with five
+explicitly opt-in pretrained/download tests skipped. These versions describe that
+verified environment, not a universal lockfile. Model weights are still downloaded
+on demand and retain their own licences and storage requirements.
+
 Dependencies have compatibility floors, not a lockfile. Keep inference dependencies
 updated, especially PyTorch. The core local tests were run on Python 3.13.5; that does
 not imply all optional third-party runtimes were installed or tested on that version.
@@ -365,6 +384,35 @@ with Upscaler("4x-realesr-general-x4v3", device="auto") as upscaler:
 The same session can process many images without reloading the model. `upscale_image`
 accepts and returns a Pillow image. Sessions are not thread-safe; use separate sessions
 or external serialization. See `examples/batch_api.py` and [the plugin guide](docs/PLUGINS.md).
+
+## Agent skill: use and improve RasterMoves
+
+The repository includes the discoverable
+[`$use-and-improve-rastermoves`](.agents/skills/use-and-improve-rastermoves/SKILL.md)
+skill for image-upscaling work. It wraps the existing CLI and API guidance in a
+continuous improvement loop: verify the image and provenance, capture friction from
+the real run, make the smallest reusable improvement, test it, document it here, then
+commit and verify the focused patch on GitHub.
+
+Example requests:
+
+```text
+Use $use-and-improve-rastermoves to upscale this cover to 3000 pixels wide, preserve
+transparency, verify the output, and improve any reusable part of the workflow you find.
+
+Use $use-and-improve-rastermoves to compare suitable photo models on this image, explain
+the visible trade-offs, and turn the clearest workflow gap into a tested patch.
+```
+
+Each resulting improvement adds a concise reproducible command or API example to this
+README. Add a labelled before/after screenshot or equal-coordinate 100% crops under
+`docs/assets/` only when they materially demonstrate a visual change, comparison, or
+diagnostic; text-only changes and private source images do not need screenshots. The
+skill's [evaluation checklist](.agents/skills/use-and-improve-rastermoves/references/evaluation-checklist.md)
+defines the evidence, visual checks, and screenshot standard.
+
+The skill does not make generative detail factual, waive model licences, permit private
+inputs to be committed, or turn a local commit into proof that GitHub received it.
 
 ## Validation and development
 

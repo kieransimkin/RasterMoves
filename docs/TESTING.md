@@ -314,6 +314,29 @@ Full pretrained tests require explicit RASTERMOVES_REFINE_LIVE=1, optionally
 RASTERMOVES_REFINE_DEVICE=cuda. They download multi-gigabyte model bundles and should
 be followed by visual evaluation on representative inputs before making quality claims.
 
+---
+
+# RasterMoves 0.3.0 optional-runtime follow-up - validation
+
+Date: 2026-10-03
+
+A new isolated CPython 3.13.14 environment installed every mutually compatible
+optional group: `torch`, `onnx-gpu`, `refine`, `trace`, `gdrive`, `extra-arches`, and
+`dev`. The CPU `onnxruntime` package was deliberately excluded because the README
+forbids installing it alongside `onnxruntime-gpu`.
+
+- `uv pip check` reported all 67 packages compatible.
+- PyTorch 2.14.1+cu126 reported CUDA available on an NVIDIA RTX 4060 Ti.
+- ONNX Runtime GPU 1.30.0 exposed TensorRT, CUDA and CPU execution providers.
+- Diffusers 0.35.2 loaded both SD1.5 and SDXL ControlNet img2img pipeline classes.
+- `rastermoves doctor` reported the expected package and device inventory.
+- With `RASTERMOVES_REQUIRE_DIFFUSERS=1`, the complete local suite passed 347 tests
+  with five explicit live pretrained/download tests skipped.
+
+This resolves the earlier local optional-runtime gap for synthetic and offline tests.
+It does not claim that pretrained model weights were downloaded, that a multi-gigabyte
+refinement run completed, or that image quality was visually assessed.
+
 ## Scope
 
 Implemented: native SD1.5/SDXL ControlNet Tile same-size refinement, standalone and

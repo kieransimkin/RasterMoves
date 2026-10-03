@@ -1,0 +1,4 @@
+interface:
+  display_name: "Use and Improve RasterMoves"
+  short_description: "Upscale images and improve RasterMoves safely"
+  default_prompt: "Use $use-and-improve-rastermoves to upscale this image, verify the result, and turn any reusable workflow improvement into a tested repository patch."
