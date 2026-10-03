@@ -110,6 +110,10 @@ failures, not presented as successful results. Each model's licence still applie
 
 Use a new output folder, `--resume`, or `--overwrite` explicitly. Standard tile,
 precision, device, final-size, format, alpha, offline and checksum options also apply.
+One device and precision apply to the whole sweep. If only particular models reject
+that combination, keep the original `summary.json` and rerun those model IDs into a
+separate folder with compatible settings and the same final-size option; changing
+device or precision is not a valid `--resume` of the original comparison.
 See [all-model comparisons](docs/ALL_MODELS.md) for details and resume boundaries.
 
 ## Optional generative detail refinement

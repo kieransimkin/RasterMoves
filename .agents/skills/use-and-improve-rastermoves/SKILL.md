@@ -178,3 +178,35 @@ and a brief blogworthiness assessment under the parent project rules.
   tiny-runtime tests passed, and the complete suite reported 347 passed and five skipped.
 - **Limit:** this does not verify pretrained multi-gigabyte model downloads or visual
   quality. Keep those live tests opt-in and assess representative images separately.
+
+### One all-model precision does not suit every registered model
+
+- **Symptom (3 October 2026):** an eight-model comparison using CUDA FP16 completed
+  five outputs, while LexicaHAT and UltraSharpV2 failed with `FP16 requires CUDA and a
+  model advertising half-precision support; use fp32.`
+- **Cause supported by current evidence:** all-model mode applies one precision to the
+  entire selected registry, while those model descriptors did not advertise FP16.
+- **Corrective action that succeeded:** preserve the original sweep and run only the
+  failed model IDs into a separate folder with CUDA FP32, the same 3000-pixel final
+  width, and smaller 128-pixel tiles.
+- **Verification:** both fallback outputs were saved as 3000 by 3000 RGB PNG files with
+  provenance sidecars and independent SHA-256 hashes.
+- **Limit:** the fallback files are separate runs and must not be presented as successes
+  in the original `summary.json`. Changing precision is not a valid resume of that run.
+
+### ONNX advertises CUDA but cannot load its matching Windows libraries
+
+- **Symptom (3 October 2026):** SPANkendata failed after ONNX Runtime reported no CUDA
+  execution-provider device and a missing `cublasLt64_13.dll`, despite listing the CUDA
+  provider during environment discovery.
+- **Evidence:** ONNX Runtime's CUDA provider documentation, checked 3 October 2026,
+  requires a runtime-compatible CUDA and cuDNN combination:
+  <https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html>.
+- **Corrective action that succeeded:** keep the downloaded, checksum-verified ONNX
+  weights and rerun only SPANkendata with `--device cpu --precision fp32` into a separate
+  fallback folder.
+- **Verification:** RasterMoves saved a 3000 by 3000 RGB PNG, report and trace; the run
+  completed successfully in 14.353 seconds.
+- **Limit:** CPU fallback is slower and does not repair the CUDA runtime. Use it when a
+  completed visual comparison matters more than GPU benchmarking; otherwise install a
+  matching CUDA/cuDNN runtime and verify the provider again.

@@ -99,6 +99,30 @@ an ONNX resource fail explicitly rather than disappearing from the summary. RGBA
 preserved with PNG/WebP/TIFF; transparent input with JPEG is rejected before loading.
 The native AND final output pixel limit still applies.
 
+### Recovering models that need different runtime settings
+
+One device, backend and precision apply to every model in an all-model run. A mixed
+registry can therefore complete with some model-specific failures: for example, a
+PyTorch model may reject FP16 while other models use it successfully, or an ONNX CUDA
+provider may be registered but unable to load the CUDA/cuDNN libraries it needs.
+Preserve the original comparison and its `summary.json`, then run only the affected
+model IDs into a separate fallback folder with the same final dimensions:
+
+```bash
+# A model whose manifest/runtime does not support FP16.
+rastermoves upscale cover.png -m 4x-LexicaHAT -o fallbacks/model-4x-LexicaHAT.png \
+  --width 3000 --device cuda --precision fp32 --report
+
+# An ONNX model when the local CUDA execution provider cannot initialise.
+rastermoves upscale cover.png -m 4x-SPANkendata -o fallbacks/model-4x-SPANkendata.png \
+  --width 3000 --device cpu --precision fp32 --report
+```
+
+These are separate provenance records, not a resumed all-model summary. Compare the
+saved dimensions and hashes before adding fallback files to a contact sheet. Prefer
+repairing a generally required CUDA runtime mismatch; CPU fallback is useful when the
+question is visual comparison and the slower run is acceptable.
+
 ## Resume and overwriting
 
 ```bash
