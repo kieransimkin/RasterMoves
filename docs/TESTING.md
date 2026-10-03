@@ -337,6 +337,15 @@ This resolves the earlier local optional-runtime gap for synthetic and offline t
 It does not claim that pretrained model weights were downloaded, that a multi-gigabyte
 refinement run completed, or that image quality was visually assessed.
 
+## Documentation media
+
+`docs/assets/rastermoves-improvement-loop.png` is a 1600 x 900 PNG generated on
+3 October 2026 from the verified skill workflow. It contains no third-party image,
+private path, account data or model output; the public-use basis is Kieran's own
+RasterMoves repository and workflow. The retained file is the publication original,
+with no redaction or derived crop. SHA-256:
+`C75421C4AC99E32F6D18E24BC953B349A7AC2CED6C02700B03805E712CAC7DBD`.
+
 ## Scope
 
 Implemented: native SD1.5/SDXL ControlNet Tile same-size refinement, standalone and

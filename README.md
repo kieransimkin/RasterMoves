@@ -394,6 +394,11 @@ continuous improvement loop: verify the image and provenance, capture friction f
 the real run, make the smallest reusable improvement, test it, document it here, then
 commit and verify the focused patch on GitHub.
 
+![Six-step RasterMoves loop from intentional image run through verification, workflow improvement, documentation and verified GitHub commit](docs/assets/rastermoves-improvement-loop.png)
+
+The loop keeps image results and reusable tool changes connected without committing
+private inputs, model weights or unsupported claims.
+
 Example requests:
 
 ```text
