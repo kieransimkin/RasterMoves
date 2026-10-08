@@ -1,6 +1,6 @@
 # RasterMoves
 
-[![RasterMoves logo](https://raw.githubusercontent.com/kieransimkin/RasterMoves/v0.3.2/docs/branding/logo.png)](https://kieransimkin.co.uk/danceflow/)
+[![RasterMoves logo](https://raw.githubusercontent.com/kieransimkin/RasterMoves/v0.3.3/docs/branding/logo.png)](https://kieransimkin.co.uk/danceflow/)
 
 By **[Kieran Simkin](https://kieransimkin.co.uk/)** · [DanceFlow ecosystem](https://kieransimkin.co.uk/danceflow/) · [Vector logo and usage guide](docs/branding/README.md).
 
@@ -12,7 +12,7 @@ Each model is an independent plugin, normally a small JSON manifest. Shared PyTo
 and ONNX Runtime backends handle architecture loading and inference. Weights are fetched
 from the model's recorded sources only when needed, verified, and cached for later use.
 
-**Version:** 0.3.2. Distribution name: `rastermoves`. See [release setup](docs/RELEASING.md)
+**Version:** 0.3.3. Distribution name: `rastermoves`. See [release setup](docs/RELEASING.md)
 for PyPI, TestPyPI, GitHub Releases and container publishing.
 It is an independent implementation, not an official OpenModelDB product.
 

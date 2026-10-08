@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.3 - 2026-10-08
+
+- Apply the reviewed capability description and author website to OCI container labels as well as language packages. Preserve previously published versions and original logo bytes.
+
+
 ## 0.3.2 - 2026-10-08
 
 - Add an original tool-specific vector logo and PNG companion in the shared DanceFlow visual style.

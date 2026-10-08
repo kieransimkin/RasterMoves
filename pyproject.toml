@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rastermoves"
-version = "0.3.2"
+version = "0.3.3"
 description = "Local image upscaling with PyTorch/ONNX model plugins and optional refinement. https://kieransimkin.co.uk/"
 readme = "README.md"
 requires-python = ">=3.10"
