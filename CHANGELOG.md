@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 - 2026-10-08
+
+- Include the reviewed use-and-improve workflow, evaluation checklist and improvement-loop diagram.
+- Document mixed-runtime comparison recovery and clarify the current optional model routes.
+- No image-processing algorithm or default-model changes.
+
 ## 0.3.0 — 2026-10-02
 
 - Add optional same-size SD1.5/SDXL ControlNet Tile img2img workflows, with pinned

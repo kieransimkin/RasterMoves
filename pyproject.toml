@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rastermoves"
-version = "0.3.0"
+version = "0.3.1"
 description = "Modular AI image upscaling and optional generative refinement for DanceFlow, with on-demand model downloads"
 readme = "README.md"
 requires-python = ">=3.10"

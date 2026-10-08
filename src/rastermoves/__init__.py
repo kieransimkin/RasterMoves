@@ -1,5 +1,5 @@
 """RasterMoves: modular image upscaling and enhancement for DanceFlow."""
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 # Keep importing the package lightweight; neural frameworks load only on use.
 def __getattr__(name):
