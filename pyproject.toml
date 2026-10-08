@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rastermoves"
-version = "0.3.1"
-description = "Modular AI image upscaling and optional generative refinement for DanceFlow, with on-demand model downloads"
+version = "0.3.2"
+description = "Local image upscaling with PyTorch/ONNX model plugins and optional refinement. https://kieransimkin.co.uk/"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "GPL-3.0-only"}
@@ -27,6 +27,7 @@ all = ["psutil>=5.9.8,<8", "torch>=2.6", "torchvision>=0.21", "spandrel>=0.4.2,<
 dev = ["psutil>=5.9.8,<8", "pytest>=8", "build>=1.2", "ruff>=0.9", "twine>=6", "PyYAML>=6", "tomli>=2; python_version < '3.11'"]
 
 [project.urls]
+"DanceFlow ecosystem" = "https://kieransimkin.co.uk/danceflow/"
 Homepage = "https://kieransimkin.co.uk/"
 Repository = "https://github.com/kieransimkin/RasterMoves"
 Issues = "https://github.com/kieransimkin/RasterMoves/issues"
@@ -49,3 +50,6 @@ markers = ["live: optional pretrained inference; explicitly enabled by RASTERMOV
 [tool.ruff]
 line-length = 110
 target-version = "py310"
+
+[tool.setuptools.data-files]
+"share/rastermoves/branding" = ["docs/branding/logo.svg", "docs/branding/logo-monochrome.svg", "docs/branding/logo.png", "docs/branding/README.md"]

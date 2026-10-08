@@ -1,11 +1,18 @@
 # RasterMoves
 
+[![RasterMoves logo](https://raw.githubusercontent.com/kieransimkin/RasterMoves/v0.3.2/docs/branding/logo.png)](https://kieransimkin.co.uk/danceflow/)
+
+By **[Kieran Simkin](https://kieransimkin.co.uk/)** · [DanceFlow ecosystem](https://kieransimkin.co.uk/danceflow/) · [Vector logo and usage guide](docs/branding/README.md).
+
+Local image upscaling with PyTorch/ONNX model plugins and optional refinement. https://kieransimkin.co.uk/
+
+
 A modular Python CLI and library for **local image upscaling with OpenModelDB models**.
 Each model is an independent plugin, normally a small JSON manifest. Shared PyTorch/Spandrel
 and ONNX Runtime backends handle architecture loading and inference. Weights are fetched
 from the model's recorded sources only when needed, verified, and cached for later use.
 
-**Version:** 0.3.0. Distribution name: `rastermoves`. See [release setup](docs/RELEASING.md)
+**Version:** 0.3.2. Distribution name: `rastermoves`. See [release setup](docs/RELEASING.md)
 for PyPI, TestPyPI, GitHub Releases and container publishing.
 It is an independent implementation, not an official OpenModelDB product.
 

@@ -7,3 +7,5 @@ include src/rastermoves/py.typed
 recursive-include .github *.yml
 recursive-include scripts *.py
 include Dockerfile .dockerignore
+
+recursive-include docs/branding *.svg *.png *.md
