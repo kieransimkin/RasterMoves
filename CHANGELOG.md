@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4 - 2026-10-08
+
+- Add explicit agent capability, improvement, validation and upstream PR guidance to the README and contributor instructions.
+
 ## 0.3.3 - 2026-10-08
 
 - Apply the reviewed capability description and author website to OCI container labels as well as language packages. Preserve previously published versions and original logo bytes.
