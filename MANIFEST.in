@@ -9,3 +9,4 @@ recursive-include scripts *.py
 include Dockerfile .dockerignore
 
 recursive-include docs/branding *.svg *.png *.md
+include AGENTS.md CONTRIBUTING.md
