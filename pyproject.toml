@@ -19,7 +19,7 @@ dependencies = [
 torch = ["torch>=2.6", "torchvision>=0.21", "spandrel>=0.4.2,<0.5", "safetensors>=0.4.5"]
 onnx = ["onnxruntime>=1.20"]
 onnx-gpu = ["onnxruntime-gpu>=1.20"]
-refine = ["torch>=2.6", "diffusers==0.35.2", "transformers>=4.44,<5", "accelerate>=1.0,<2", "safetensors>=0.4.5"]
+refine = ["torch>=2.6", "diffusers==0.40.0", "transformers>=4.44,<5", "accelerate>=1.0,<2", "safetensors>=0.4.5"]
 trace = ["psutil>=5.9.8,<8"]
 gdrive = ["gdown>=5.2,<6"]
 extra-arches = ["spandrel-extra-arches>=0.2"]
