@@ -1,0 +1,26 @@
+diff --git a/src/rastermoves/gui.py b/src/rastermoves/gui.py
+--- a/src/rastermoves/gui.py
++++ b/src/rastermoves/gui.py
+@@ -241,8 +241,8 @@ class RasterMovesGUI:
+                 "options": {},
+                 "cache_dir": str(self.cache),
+                 "offline": False,
+-                "device": "auto",
+-                "precision": "auto",
++                "device": run_options.get("device", "auto"),
++                "precision": run_options.get("precision", "fp32"),
+                 "offload": "none",
+                 "vae_tiling": True,
+                 "scheduler": "ddim",
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -123,7 +123,9 @@ it. Drop an image onto the window or use **Browse**, choose the models to compare
+ optionally enable `sd15-tile` or `sdxl-tile` post-diffusion refinement. RasterMoves then
+ runs the existing sequential comparison workflow and presents the original beside each
+ successful output. With refinement enabled, both the pure upscale baseline and the
+-post-diffusion result are available in the comparison selector. Failed models remain
++post-diffusion result are available in the comparison selector. The GUI's **Device**
++and **Precision** selectors apply consistently to both the neural upscaler and the
++optional diffusion-refinement stage. Failed models remain
+ isolated and are recorded in `summary.json`.
