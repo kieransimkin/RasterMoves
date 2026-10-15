@@ -68,13 +68,18 @@ def normalize_url(url: str) -> str:
 class Downloader:
     """Content-addressed model cache. Verified on every read, locked and atomically published."""
     def __init__(self, cache=None, *, offline=False, strict_checksums=False,
-                 max_bytes=4 * 1024**3):
+                 max_bytes=4 * 1024**3, progress=None):
         self.root = cache_dir(cache)
         self.offline = offline or os.environ.get("RASTERMOVES_OFFLINE", "").lower() in {"1", "true", "yes"}
         self.strict_checksums = strict_checksums
         self.max_bytes = max_bytes
+        self.progress = progress
         if max_bytes <= 0:
             raise DownloadError("max_bytes must be positive.")
+
+    def _progress(self, done: int, total: int | None, label: str) -> None:
+        if self.progress:
+            self.progress(done, total, label)
 
     def target(self, r: Resource) -> Path:
         key = r.sha256 or hashlib.sha256(json.dumps(r.urls).encode()).hexdigest()
@@ -117,6 +122,7 @@ class Downloader:
             if path.exists():
                 try:
                     self._verify(path, r, cached=True)
+                    self._progress(path.stat().st_size, path.stat().st_size, "cached")
                     return path
                 except IntegrityError:
                     if self.offline:
@@ -138,6 +144,7 @@ class Downloader:
                         "sha256": digest, "publisher_verified": bool(r.sha256), "size": path.stat().st_size,
                         "source_host": urlparse(url).hostname,
                     })
+                    self._progress(path.stat().st_size, path.stat().st_size, "complete")
                     return path
                 except (DownloadError, OSError) as e:
                     errors.append(f"{urlparse(url).hostname}: {e}")
@@ -149,7 +156,9 @@ class Downloader:
     @traced("download")
     def _fetch(self, url: str, dest: Path, r: Resource):
         kind = source_kind(url)
-        log.info("Downloading weights from %s", urlparse(url).hostname)
+        host = urlparse(url).hostname or kind
+        log.info("Downloading weights from %s", host)
+        self._progress(0, r.size, host)
         if kind == "manual":
             raise DownloadError("This host, archive or folder needs a direct file mirror/manual download.")
         if kind == "huggingface":
@@ -163,6 +172,7 @@ class Downloader:
                 if source.stat().st_size > self.max_bytes:
                     raise DownloadError("Hugging Face file exceeds the configured size limit.")
                 shutil.copyfile(source, dest)
+                self._progress(source.stat().st_size, r.size or source.stat().st_size, host)
             except DownloadError:
                 raise
             except Exception as e:
@@ -176,9 +186,11 @@ class Downloader:
                 result = gdown.download(url=url, output=str(dest), quiet=False, fuzzy=True, use_cookies=False)
                 if result is None or not dest.exists():
                     raise DownloadError("Google Drive file unavailable or over quota.")
+                self._progress(dest.stat().st_size, r.size or dest.stat().st_size, host)
             except DownloadError:
                 raise
             except Exception as e:
                 raise DownloadError(f"Google Drive download failed ({type(e).__name__}).") from e
         else:
-            stream_download(normalize_url(url), dest, max_bytes=min(self.max_bytes, r.size or self.max_bytes))
+            stream_download(normalize_url(url), dest, max_bytes=min(self.max_bytes, r.size or self.max_bytes),
+                            progress=lambda done, total: self._progress(done, total or r.size, host))

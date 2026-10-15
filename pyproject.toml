@@ -22,6 +22,7 @@ onnx-gpu = ["onnxruntime-gpu>=1.20"]
 refine = ["torch>=2.6", "diffusers==0.35.2", "transformers>=4.44,<5", "accelerate>=1.0,<2", "safetensors>=0.4.5"]
 trace = ["psutil>=5.9.8,<8"]
 gdrive = ["gdown>=5.2,<6"]
+gui = ["tkinterdnd2>=0.4.2,<1"]
 extra-arches = ["spandrel-extra-arches>=0.2"]
 all = ["psutil>=5.9.8,<8", "torch>=2.6", "torchvision>=0.21", "spandrel>=0.4.2,<0.5", "safetensors>=0.4.5", "onnxruntime>=1.20", "gdown>=5.2,<6"]
 dev = ["psutil>=5.9.8,<8", "pytest>=8", "build>=1.2", "ruff>=0.9", "twine>=6", "PyYAML>=6", "tomli>=2; python_version < '3.11'"]
@@ -35,6 +36,7 @@ Changelog = "https://github.com/kieransimkin/RasterMoves/blob/main/CHANGELOG.md"
 
 [project.scripts]
 rastermoves = "rastermoves.cli:main"
+rastermoves-gui = "rastermoves.gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

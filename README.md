@@ -95,6 +95,28 @@ Dependencies have compatibility floors, not a lockfile. Keep inference dependenc
 updated, especially PyTorch. The core local tests were run on Python 3.13.5; that does
 not imply all optional third-party runtimes were installed or tested on that version.
 
+## Desktop GUI
+
+Install the lightweight drag/drop helper and launch the GUI:
+
+```bash
+python -m pip install -e ".[torch,onnx,refine,gui]"
+rastermoves-gui
+```
+
+The GUI lists registered upscalers, shows which preferred weight is already cached,
+and lets you select/download models with live byte progress where the provider exposes
+it. Drop an image onto the window or use **Browse**, choose the models to compare, and
+optionally enable `sd15-tile` or `sdxl-tile` post-diffusion refinement. RasterMoves then
+runs the existing sequential comparison workflow and presents the original beside each
+successful output. With refinement enabled, both the pure upscale baseline and the
+post-diffusion result are available in the comparison selector. Failed models remain
+isolated and are recorded in `summary.json`.
+
+`tkinterdnd2` is optional and only supplies native drag/drop; the file-open dialog works
+without it. The GUI uses the same processing, provenance, verification, resume-safe
+workflow code, and model directory as the CLI rather than maintaining a second engine.
+
 ## Compare every model
 
 ```bash
@@ -312,11 +334,17 @@ rastermoves --cache-dir ./model-cache download 4x-UltraSharpV2 --backend spandre
 rastermoves --cache-dir ./model-cache upscale input.png -o output.png -m 4x-UltraSharpV2 --offline
 ```
 
-Defaults use platform-specific user cache/config directories. `RASTERMOVES_CACHE`
-overrides the cache; `RASTERMOVES_OFFLINE=1` disables network use through the tool.
-The cache contains `weights`, `huggingface`, `catalog.json`, and `imported-models` as
-needed. Hugging Face's own cache and the verified weight copy can consume duplicate
-disk space. Once the verified copy exists, inference needs only that copy.
+By default, model data is kept in `models/` at the RasterMoves source-project root,
+so downloaded and partially downloaded weights stay with the checkout instead of an
+opaque global system cache. `/models/` is gitignored. For an installed package where
+no source checkout can be located, the fallback is `./models` in the current working
+directory. `RASTERMOVES_CACHE` or `--cache-dir` still overrides this location, and
+`RASTERMOVES_PROJECT_ROOT` can explicitly identify the project root.
+`RASTERMOVES_OFFLINE=1` disables network use through the tool. The model directory
+contains `weights`, `huggingface`, `diffusion-hub`, `catalog.json`, and
+`imported-models` as needed. Hugging Face's own cache and the verified weight copy can
+consume duplicate disk space. Once the verified copy exists, inference needs only that
+copy.
 
 A publisher SHA-256, when supplied, is checked on every cache use. Files without a
 publisher checksum get a local integrity receipt, which detects later corruption

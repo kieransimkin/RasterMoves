@@ -81,24 +81,24 @@ def test_cache_environment_and_explicit_override(tmp_path, monkeypatch):
     assert explicit.is_dir()
 
 
-def test_default_platform_directories_use_new_name(tmp_path, monkeypatch):
+def test_default_model_directory_is_project_local(tmp_path, monkeypatch):
     calls = []
-
-    def cache_path(name):
-        calls.append(("cache", name))
-        return tmp_path / "cache" / name
+    project = tmp_path / "checkout"
+    (project / "src" / "rastermoves").mkdir(parents=True)
+    (project / "pyproject.toml").write_text("[project]\nname='rastermoves'\n", encoding="utf-8")
 
     def config_path(name):
         calls.append(("config", name))
         return tmp_path / "config" / name
 
     monkeypatch.delenv("RASTERMOVES_CACHE", raising=False)
+    monkeypatch.delenv("RASTERMOVES_PROJECT_ROOT", raising=False)
     monkeypatch.delenv("RASTERMOVES_PLUGIN_PATH", raising=False)
-    monkeypatch.setattr(paths, "user_cache_path", cache_path)
+    monkeypatch.setattr(paths, "__file__", str(project / "src" / "rastermoves" / "paths.py"))
     monkeypatch.setattr(paths, "user_config_path", config_path)
-    assert paths.cache_dir() == tmp_path / "cache" / "rastermoves"
+    assert paths.cache_dir() == project / "models"
     assert paths.plugin_dirs() == [tmp_path / "config" / "rastermoves" / "models"]
-    assert calls == [("cache", "rastermoves"), ("config", "rastermoves")]
+    assert calls == [("config", "rastermoves")]
 
 
 def test_plugin_directory_environment(tmp_path, monkeypatch):
@@ -118,8 +118,8 @@ def test_legacy_environment_is_not_silently_used(tmp_path, monkeypatch):
     monkeypatch.delenv("RASTERMOVES_OFFLINE", raising=False)
     monkeypatch.setenv("UPSCALELAB_CACHE", str(tmp_path / "old"))
     monkeypatch.setenv("UPSCALELAB_OFFLINE", "1")
-    monkeypatch.setattr(paths, "user_cache_path", lambda _: tmp_path / "new")
-    assert paths.cache_dir() == tmp_path / "new"
+    monkeypatch.setattr(paths, "project_root", lambda: tmp_path / "checkout")
+    assert paths.cache_dir() == tmp_path / "checkout" / "models"
     assert not Downloader(tmp_path).offline
 
 

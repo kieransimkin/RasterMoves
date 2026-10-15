@@ -118,7 +118,8 @@ def validate_bundle(spec: RefinerSpec, roots: dict[str, Path]) -> None:
         raise UpscaleError("Expected a standard ControlNetModel, not a custom architecture.")
 
 
-def download_bundle(spec: RefinerSpec, *, cache_dir=None, offline=False, strict_checksums=False) -> tuple[dict, list]:
+def download_bundle(spec: RefinerSpec, *, cache_dir=None, offline=False, strict_checksums=False,
+                    progress=None) -> tuple[dict, list]:
     """Fetch only required component files, never full repos or executable code.
 
     Every request uses an immutable revision. HF_TOKEN authentication stays inside
@@ -128,8 +129,13 @@ def download_bundle(spec: RefinerSpec, *, cache_dir=None, offline=False, strict_
     dl = Downloader(cache_dir, offline=offline)
     cache = dl.root / "diffusion-hub"
     roots, records = {}, {"base": {}, "controlnet": {}}
+    total_files = sum(len(component_files(component, spec.family)) for component in (spec.base, spec.controlnet))
+    completed = 0
 
     def fetch(component, name):
+        nonlocal completed
+        if progress:
+            progress(completed, total_files, component.role, name, "downloading")
         try:
             path = Path(hf_hub_download(component.repo_id, name, revision=component.revision,
                                        cache_dir=str(cache), local_files_only=dl.offline))
@@ -146,6 +152,9 @@ def download_bundle(spec: RefinerSpec, *, cache_dir=None, offline=False, strict_
             if strict_checksums and not record["content_address_verified"]:
                 raise UpscaleError(f"No verifiable content address for {component.role}/{name}.")
             records[component.role][name] = record
+        completed += 1
+        if progress:
+            progress(completed, total_files, component.role, name, "ready")
 
     with span("refine_download"):
         # Validate the architecture and loader metadata BEFORE any multi-GB weights.

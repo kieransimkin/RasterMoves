@@ -25,7 +25,7 @@ def session() -> requests.Session:
     return s
 
 
-def stream_download(url: str, dest: Path, *, max_bytes: int, http=None) -> None:
+def stream_download(url: str, dest: Path, *, max_bytes: int, http=None, progress=None) -> None:
     validate_url(url)
     own = http is None
     http = http or session()
@@ -46,12 +46,15 @@ def stream_download(url: str, dest: Path, *, max_bytes: int, http=None) -> None:
         with response:
             response.raise_for_status()
             length = response.headers.get("Content-Length")
-            if length and int(length) > max_bytes:
+            total = int(length) if length else None
+            if total and total > max_bytes:
                 raise DownloadError("Download exceeds the configured size limit.")
             content_type = response.headers.get("Content-Type", "").lower()
             if "text/html" in content_type:
                 raise DownloadError("Host returned a web/login page, not a downloadable file.")
             n = 0
+            if progress:
+                progress(0, total)
             with dest.open("wb") as f:
                 for block in response.iter_content(1024 * 1024):
                     if not block:
@@ -60,6 +63,8 @@ def stream_download(url: str, dest: Path, *, max_bytes: int, http=None) -> None:
                     if n > max_bytes:
                         raise DownloadError("Download exceeds the configured size limit.")
                     f.write(block)
+                    if progress:
+                        progress(n, total)
                 f.flush()
                 os.fsync(f.fileno())
             if not n:
