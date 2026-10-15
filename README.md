@@ -104,6 +104,23 @@ python -m pip install -e ".[torch,onnx,refine,gui]"
 rastermoves-gui
 ```
 
+For a source checkout, the easiest option is one of the self-contained launchers:
+
+```text
+Windows:          double-click start_gui.bat
+PowerShell:       .\start_gui.ps1
+Linux / macOS:    ./start_gui.sh
+```
+
+The launchers bootstrap Astral's `uv` when it is missing, ask `uv` to install a
+managed Python 3.12 when needed, create a project-local `.venv`, and install/update
+the complete RasterMoves GUI stack (`all`, `refine`, `extra-arches`, and `gui`)
+before starting `rastermoves-gui`. No separately installed system Python or manual
+`pip` setup is required. The first launch therefore needs internet access and can
+take a while because PyTorch, diffusion dependencies, and selected model weights are
+large; subsequent launches reuse `.venv` and the gitignored project `models/` folder.
+Extra command-line arguments supplied to any launcher are passed through to the GUI.
+
 The GUI lists registered upscalers, shows which preferred weight is already cached,
 and lets you select/download models with live byte progress where the provider exposes
 it. Drop an image onto the window or use **Browse**, choose the models to compare, and
