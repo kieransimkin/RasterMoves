@@ -127,8 +127,10 @@ it. Drop an image onto the window or use **Browse**, choose the models to compar
 optionally enable `sd15-tile` or `sdxl-tile` post-diffusion refinement. RasterMoves then
 runs the existing sequential comparison workflow and presents the original beside each
 successful output. With refinement enabled, both the pure upscale baseline and the
-post-diffusion result are available in the comparison selector. Failed models remain
-isolated and are recorded in `summary.json`.
+post-diffusion result are available in the comparison selector. The GUI's **Device**
+and **Precision** selectors apply consistently to both the neural upscaler and the
+optional diffusion-refinement stage. Failed models remain isolated and are recorded
+in `summary.json`.
 
 `tkinterdnd2` is optional and only supplies native drag/drop; the file-open dialog works
 without it. The GUI uses the same processing, provenance, verification, resume-safe
