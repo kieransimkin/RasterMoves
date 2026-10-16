@@ -1,5 +1,5 @@
 # Build a wheel first: python -m build. Release CI copies its tested wheel here.
-FROM python:3.12-slim-bookworm
+FROM python:3.15-slim-bookworm
 ARG VERSION=dev
 ARG REVISION=unknown
 ARG SOURCE_URL=https://github.com/kieransimkin/RasterMoves
