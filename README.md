@@ -16,26 +16,15 @@ from the model's recorded sources only when needed, verified, and cached for lat
 for PyPI, TestPyPI, GitHub Releases and container publishing.
 It is an independent implementation, not an official OpenModelDB product.
 
+## Before every new workflow
 
-## Agents and contributors
+Check the latest stable official release and the actual installed/imported version before starting; do not infer currency from a directory name or a development checkout. Read the current release notes, tagged capability documentation and relevant Potential problems. Use the [DanceFlow release preflight](https://github.com/kieransimkin/DanceFlow/blob/main/docs/workflows/release-preflight.md) and [complete capability references](https://github.com/kieransimkin/DanceFlow/blob/main/docs/capabilities/index.md).
 
-Agents using RasterMoves should inspect its available capabilities, use them fully where they fit the task, and look for useful improvements wherever possible. When a required feature is missing, or a reusable reliability, usability, performance or documentation gap is found, improve this tool rather than maintaining a separate workaround. If no worthwhile change is justified, explain why.
+People and agents should consider the full ecosystem, use all capabilities that materially serve the task, compose supported files/APIs, and improve a demonstrated reusable gap in its canonical tool. Record why no worthwhile change is justified when that is the result. Keep independent tool identities, compatibility, source clocks, privacy, model/download costs and publication/deployment permissions intact. Store weights and model-specific caches in the owning project's ignored `models/`.
 
-Submit every improvement as a pull request to [RasterMoves](https://github.com/kieransimkin/RasterMoves/pulls), with relevant tests, documentation and a reproducible example. Follow [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) for the contribution and validation workflow.
+## Find your route
 
-Project website: [https://kieransimkin.co.uk/danceflow/](https://kieransimkin.co.uk/danceflow/).
-
-## Part of DanceFlow
-
-**RasterMoves** is the image-upscaling and enhancement component of the DanceFlow
-family, alongside **KeywordMoves**, **StemLab**, **DanceMoves**, and **DanceRudiments**.
-It runs as a standalone Python library or command-line tool; it does not require those
-other components to be installed. The package, Python import, and executable all use
-`rastermoves`.
-
-Version 0.1.1 renamed the original UpscaleLab package. See the
-[migration guide](docs/MIGRATION.md) for import, command, plugin, environment-variable,
-and existing-cache changes, and the [changelog](CHANGELOG.md) for release details.
+[Install](#install) · [First upscale](#first-upscale) · [Desktop GUI](#desktop-gui) · [Model plugins and the OpenModelDB catalogue](#model-plugins-and-the-openmodeldb-catalogue) · [Compare every model](#compare-every-model) · [Memory, tiling and image handling](#memory-tiling-and-image-handling) · [Optional generative detail refinement](#optional-generative-detail-refinement) · [Downloads, verification and offline use](#downloads-verification-and-offline-use) · [Timing and resource traces](#timing-and-resource-traces)
 
 ## Install
 
@@ -95,6 +84,39 @@ Dependencies have compatibility floors, not a lockfile. Keep inference dependenc
 updated, especially PyTorch. The core local tests were run on Python 3.13.5; that does
 not imply all optional third-party runtimes were installed or tested on that version.
 
+## First upscale
+
+```bash
+rastermoves upscale input.png -o output.png
+```
+
+The default plugin is `4x-realesr-general-x4v3`. The first run fetches its weights;
+subsequent runs use the verified cache. Images are processed locally and are not
+uploaded to the model host. By default, inference is FP32 and automatically selects
+CUDA, then MPS, then CPU for PyTorch; ONNX selects CUDA when available, otherwise CPU.
+
+```bash
+# Explicit model and CUDA device; save a provenance sidecar
+rastermoves upscale input.png -o output.png -m 4x-realesrgan-x4plus --device cuda --report
+
+# A Hugging Face-hosted model (review its non-commercial licence)
+rastermoves upscale input.png -o sharp.png -m 4x-UltraSharpV2
+
+# An ONNX-only starter model
+rastermoves upscale input.png -o span.png -m 4x-SPANkendata --backend onnx --device cpu
+
+# Resize to a particular width AFTER the native neural upscale
+rastermoves upscale cover.png -o cover-3000.png --width 3000
+
+# Batch processing, including subdirectories; retain transparency in PNG output
+rastermoves upscale ./originals -o ./upscaled --recursive --report
+```
+
+`--scale`, `--width`, `--height`, and `--long-edge` specify the final size while preserving
+aspect ratio. Only one may be selected. The neural model still runs at its native
+integer scale; a final Lanczos resize produces the requested size. Targets larger
+than native scale emit a warning: the extra enlargement is not another neural pass.
+
 ## Desktop GUI
 
 Install the lightweight drag/drop helper and launch the GUI:
@@ -135,154 +157,6 @@ in `summary.json`.
 `tkinterdnd2` is optional and only supplies native drag/drop; the file-open dialog works
 without it. The GUI uses the same processing, provenance, verification, resume-safe
 workflow code, and model directory as the CLI rather than maintaining a second engine.
-
-## Compare every model
-
-```bash
-# All registered models: bundled, previously synced, and your custom plugins.
-rastermoves upscale input.png --all-models -o comparison
-
-# Refresh the full OpenModelDB catalogue first, then attempt every entry.
-rastermoves upscale input.png --all-models --sync-models -o full-comparison
-
-# Inspect the planned models, licences and filenames without downloading weights.
-rastermoves upscale input.png --all-models --sync-models --dry-run -o full-comparison
-
-# Retry failures/interrupted models; reuse only checksum-verified matching results.
-rastermoves upscale input.png --all-models --resume -o full-comparison
-```
-
-Each model runs sequentially and is released before the next one. Successful models
-produce `model-MODEL_ID.png` and a provenance sidecar. `summary.json` records every
-selected model's success, failure or interruption and is updated as the run proceeds.
-Failures do not stop later models; the command exits **1** if any model fails, **130**
-on Ctrl+C, or **0** when all models succeed or are reused.
-
-`--all-models` by itself does **not** refresh metadata or secretly download the entire
-remote catalogue. Add `--sync-models` (or run `rastermoves sync`) for that. A fresh
-installation knows eight model plugins. Full-catalogue comparisons can download many
-large checkpoints. Catalogue membership is not a guarantee of runtime compatibility:
-unsupported architectures, unavailable hosts and missing runtimes are recorded as
-failures, not presented as successful results. Each model's licence still applies.
-
-Use a new output folder, `--resume`, or `--overwrite` explicitly. Standard tile,
-precision, device, final-size, format, alpha, offline and checksum options also apply.
-One device and precision apply to the whole sweep. If only particular models reject
-that combination, keep the original `summary.json` and rerun those model IDs into a
-separate folder with compatible settings and the same final-size option; changing
-device or precision is not a valid `--resume` of the original comparison.
-See [all-model comparisons](docs/ALL_MODELS.md) for details and resume boundaries.
-
-## Optional generative detail refinement
-
-RasterMoves can now **upscale, then refine at the same dimensions**, or refine an
-already enlarged image. The independent `sd15-tile` and `sdxl-tile` workflows use
-ControlNet Tile with image-to-image diffusion. This synthesises plausible detail;
-it is **not verified recovery of information**. Refinement is always opt-in on
-`upscale`. Ordinary upscaling, model IDs and existing defaults are unchanged.
-
-```bash
-# Add the separate diffusion extra. Install the appropriate PyTorch build for your hardware.
-python -m pip install -e ".[refine,trace]"
-
-rastermoves refiners
-rastermoves upscale input.png -o enhanced.png --refiner sd15-tile --seed 123 --trace
-rastermoves refine already-upscaled.png -o enhanced.png --refiner sdxl-tile --seed 123
-
-# White mask pixels protect lettering/faces; mask dimensions must match the working image.
-rastermoves refine already-upscaled.png -o enhanced.png --protect-mask protected.png
-
-# Preview without weight downloads, or resume a verified result / interrupted workflow.
-rastermoves refine already-upscaled.png -o enhanced.png --dry-run
-rastermoves refine already-upscaled.png -o enhanced.png --resume
-```
-
-Every workflow saves **`enhanced.baseline.png`** and its report before attempting
-refinement, plus **`enhanced.png.json`** with component revisions, checksums, seeds,
-parameters and actual denoising-step counts. Failed refinement preserves the baseline;
-`--resume` verifies hashes and can reuse it. Outputs must be lossless PNG/WebP/TIFF.
-Transparency is retained and fully protected pixels are restored from the baseline.
-
-Weights are **multi-gigabyte, first-use downloads**, pinned to specific Hugging Face
-commits. No repository Python code is downloaded/executed. The SD1.5 Tile checkpoint
-uses restricted tensor-only loading; other components require safetensors. Full-precision
-files are downloaded and cast for inference; low GPU precision does not reduce download
-size. Component licences apply separately. `--offline` requires all pinned files cached.
-
-`--refine-tile` and `--refine-overlap` control diffusion independently of existing
-upscaler tiles. On CUDA, `--refine-offload model` trades speed for reduced resident GPU
-memory. Existing `--trace` records refinement stages, with CUDA allocator peaks included
-in refinement reports when applicable. CPU/MPS routes exist but hardware performance is
-not promised. Tiling bounds inference work, not total output-buffer RAM.
-
-The heavy `refine` extra is intentionally **not part of `all`, default dependencies,
-or the default CPU container**. Use `.[all,refine]` explicitly for both toolsets.
-`upscale --all-models --refiner sd15-tile` applies just that refiner to every selected
-upscaler; there is no implicit refiner/seed cross product. See the
-[complete refinement guide](docs/REFINEMENT.md) for presets, masks, caching, resume,
-plugins, test limitations, and the Python API.
-
-## Timing and resource traces
-
-```bash
-python -m pip install -e ".[trace]"  # Also included in .[all] and .[dev]
-
-# A single image: output.png.trace.json (a new numbered file if it already exists).
-rastermoves upscale input.png -o output.png --trace
-
-# One timeline for an entire model comparison, with per-model metrics in summary.json.
-rastermoves upscale input.png --all-models -o comparison --trace
-
-# Named trace; --trace-file enables recording even without --trace.
-rastermoves upscale input.png -o output.png --trace-file timings/run-01.json --trace-interval 0.1
-```
-
-Traces contain wall time, process CPU time/utilization, resident/virtual memory and
-thread counts, plus system available-memory context. Timed stages distinguish model
-loading, downloads/cache verification, inference, postprocessing and output writing.
-Open the **Chrome JSON** trace in [Perfetto](https://ui.perfetto.dev/) to inspect the
-stage timeline alongside resource counters, or read the JSON directly. A concise
-run summary is printed to stderr. Batch/all-model defaults are `OUTPUT_DIR/trace.json`.
-
-This is **process-level sampling**, not GPU profiling or exact allocation tracking:
-100% CPU means one logical CPU, multi-core use can exceed 100%, and memory peaks are
-sampled estimates that include runtime/allocator memory. Tracing is off by default;
-no sampler, trace files or psutil import are used until enabled. See the
-[tracing guide](docs/PROFILING.md) for fields, limitations, failure handling, resume and
-Python API usage.
-
-## First upscale
-
-```bash
-rastermoves upscale input.png -o output.png
-```
-
-The default plugin is `4x-realesr-general-x4v3`. The first run fetches its weights;
-subsequent runs use the verified cache. Images are processed locally and are not
-uploaded to the model host. By default, inference is FP32 and automatically selects
-CUDA, then MPS, then CPU for PyTorch; ONNX selects CUDA when available, otherwise CPU.
-
-```bash
-# Explicit model and CUDA device; save a provenance sidecar
-rastermoves upscale input.png -o output.png -m 4x-realesrgan-x4plus --device cuda --report
-
-# A Hugging Face-hosted model (review its non-commercial licence)
-rastermoves upscale input.png -o sharp.png -m 4x-UltraSharpV2
-
-# An ONNX-only starter model
-rastermoves upscale input.png -o span.png -m 4x-SPANkendata --backend onnx --device cpu
-
-# Resize to a particular width AFTER the native neural upscale
-rastermoves upscale cover.png -o cover-3000.png --width 3000
-
-# Batch processing, including subdirectories; retain transparency in PNG output
-rastermoves upscale ./originals -o ./upscaled --recursive --report
-```
-
-`--scale`, `--width`, `--height`, and `--long-edge` specify the final size while preserving
-aspect ratio. Only one may be selected. The neural model still runs at its native
-integer scale; a final Lanczos resize produces the requested size. Targets larger
-than native scale emit a warning: the extra enlargement is not another neural pass.
 
 ## Model plugins and the OpenModelDB catalogue
 
@@ -335,6 +209,137 @@ supported resource, a working source, and an architecture understood by the inst
 backend. New architectures, unsupported hosts, face-alignment workflows, multi-input
 models, video models, and archive-only packages can require an additional plugin.
 No remote repository Python code is loaded or installed automatically.
+
+## Compare every model
+
+```bash
+# All registered models: bundled, previously synced, and your custom plugins.
+rastermoves upscale input.png --all-models -o comparison
+
+# Refresh the full OpenModelDB catalogue first, then attempt every entry.
+rastermoves upscale input.png --all-models --sync-models -o full-comparison
+
+# Inspect the planned models, licences and filenames without downloading weights.
+rastermoves upscale input.png --all-models --sync-models --dry-run -o full-comparison
+
+# Retry failures/interrupted models; reuse only checksum-verified matching results.
+rastermoves upscale input.png --all-models --resume -o full-comparison
+```
+
+Each model runs sequentially and is released before the next one. Successful models
+produce `model-MODEL_ID.png` and a provenance sidecar. `summary.json` records every
+selected model's success, failure or interruption and is updated as the run proceeds.
+Failures do not stop later models; the command exits **1** if any model fails, **130**
+on Ctrl+C, or **0** when all models succeed or are reused.
+
+`--all-models` by itself does **not** refresh metadata or secretly download the entire
+remote catalogue. Add `--sync-models` (or run `rastermoves sync`) for that. A fresh
+installation knows eight model plugins. Full-catalogue comparisons can download many
+large checkpoints. Catalogue membership is not a guarantee of runtime compatibility:
+unsupported architectures, unavailable hosts and missing runtimes are recorded as
+failures, not presented as successful results. Each model's licence still applies.
+
+Use a new output folder, `--resume`, or `--overwrite` explicitly. Standard tile,
+precision, device, final-size, format, alpha, offline and checksum options also apply.
+One device and precision apply to the whole sweep. If only particular models reject
+that combination, keep the original `summary.json` and rerun those model IDs into a
+separate folder with compatible settings and the same final-size option; changing
+device or precision is not a valid `--resume` of the original comparison.
+See [all-model comparisons](docs/ALL_MODELS.md) for details and resume boundaries.
+
+## Memory, tiling and image handling
+
+```bash
+# Smaller tiles to reduce inference VRAM requirements
+rastermoves upscale input.png -o output.png --tile 128 --overlap 24 --tile-pad 16
+
+# Whole-image inference, when memory permits
+rastermoves upscale input.png -o output.png --tile 0
+
+# CUDA half precision only for PyTorch models that explicitly support it
+rastermoves upscale input.png -o output.png --device cuda --precision fp16
+```
+
+Tiles overlap and are feather-blended, with an additional context halo to reduce
+boundary artifacts. Sizes are in input-image pixels. Overlap must be smaller than
+the tile size. Spandrel's descriptor handles model-specific input padding and cropping;
+ONNX constraints can be supplied in a manifest. GPU out-of-memory failures during
+supported tiled inference trigger smaller-tile retries. Model loading failures and
+host RAM exhaustion do not receive that recovery.
+
+Global-context models can behave differently on tiles. The tool respects a Spandrel
+model's discouraged/internal tiling guidance and runs a whole-image pass unless
+`--force-tiling` is supplied. That override may trade image consistency for lower VRAM.
+There is no promise that feathering eliminates every neural-model boundary artifact.
+
+Tiling limits inference VRAM, **not total output RAM**. Native-scale results are
+accumulated in host memory before final resizing. The default native AND final output
+limit is 64 megapixels; increase `--max-output-mp` only with sufficient memory. A
+3000x3000 input at 4x produces a 144-megapixel intermediate even when the final target
+is 3000 pixels wide, so it exceeds the default limit. The float RGB accumulation
+buffer plus weights alone uses about 16 bytes per native output pixel, before other
+arrays, inference workspaces and encoded output.
+
+Input PNG, JPEG, WebP, BMP and TIFF are supported via Pillow. Output supports PNG,
+lossless WebP, JPEG quality 95 and TIFF. The pipeline applies EXIF orientation and
+converts embedded profiles to sRGB. Alpha is handled separately using Lanczos by
+default; `--alpha model` sends the alpha channel through the model too. Transparent
+JPEG output is rejected rather than silently flattened. Input files are never
+replaced in place; overwriting an existing destination requires `--overwrite`.
+
+This version is an **8-bit still-image tool**. HDR/high-bit-depth input, animated
+images and multi-page inputs are rejected. EXIF metadata is intentionally not copied:
+orientation has been applied and stale dimensions/GPS fields are omitted. Neural
+upscaling can invent or alter detail; it is not forensic reconstruction.
+
+## Optional generative detail refinement
+
+RasterMoves can now **upscale, then refine at the same dimensions**, or refine an
+already enlarged image. The independent `sd15-tile` and `sdxl-tile` workflows use
+ControlNet Tile with image-to-image diffusion. This synthesises plausible detail;
+it is **not verified recovery of information**. Refinement is always opt-in on
+`upscale`. Ordinary upscaling, model IDs and existing defaults are unchanged.
+
+```bash
+# Add the separate diffusion extra. Install the appropriate PyTorch build for your hardware.
+python -m pip install -e ".[refine,trace]"
+
+rastermoves refiners
+rastermoves upscale input.png -o enhanced.png --refiner sd15-tile --seed 123 --trace
+rastermoves refine already-upscaled.png -o enhanced.png --refiner sdxl-tile --seed 123
+
+# White mask pixels protect lettering/faces; mask dimensions must match the working image.
+rastermoves refine already-upscaled.png -o enhanced.png --protect-mask protected.png
+
+# Preview without weight downloads, or resume a verified result / interrupted workflow.
+rastermoves refine already-upscaled.png -o enhanced.png --dry-run
+rastermoves refine already-upscaled.png -o enhanced.png --resume
+```
+
+Every workflow saves **`enhanced.baseline.png`** and its report before attempting
+refinement, plus **`enhanced.png.json`** with component revisions, checksums, seeds,
+parameters and actual denoising-step counts. Failed refinement preserves the baseline;
+`--resume` verifies hashes and can reuse it. Outputs must be lossless PNG/WebP/TIFF.
+Transparency is retained and fully protected pixels are restored from the baseline.
+
+Weights are **multi-gigabyte, first-use downloads**, pinned to specific Hugging Face
+commits. No repository Python code is downloaded/executed. The SD1.5 Tile checkpoint
+uses restricted tensor-only loading; other components require safetensors. Full-precision
+files are downloaded and cast for inference; low GPU precision does not reduce download
+size. Component licences apply separately. `--offline` requires all pinned files cached.
+
+`--refine-tile` and `--refine-overlap` control diffusion independently of existing
+upscaler tiles. On CUDA, `--refine-offload model` trades speed for reduced resident GPU
+memory. Existing `--trace` records refinement stages, with CUDA allocator peaks included
+in refinement reports when applicable. CPU/MPS routes exist but hardware performance is
+not promised. Tiling bounds inference work, not total output-buffer RAM.
+
+The heavy `refine` extra is intentionally **not part of `all`, default dependencies,
+or the default CPU container**. Use `.[all,refine]` explicitly for both toolsets.
+`upscale --all-models --refiner sd15-tile` applies just that refiner to every selected
+upscaler; there is no implicit refiner/seed cross product. See the
+[complete refinement guide](docs/REFINEMENT.md) for presets, masks, caching, resume,
+plugins, test limitations, and the Python API.
 
 ## Downloads, verification and offline use
 
@@ -389,50 +394,34 @@ Adding `-m MODEL_ID` to a local-file run verifies matching manifest checksums an
 metadata when available. Standalone local ONNX defaults to RGB NCHW; nonstandard
 layout/channel contracts need a manifest. TorchScript is deliberately unsupported.
 
-## Memory, tiling and image handling
+## Timing and resource traces
 
 ```bash
-# Smaller tiles to reduce inference VRAM requirements
-rastermoves upscale input.png -o output.png --tile 128 --overlap 24 --tile-pad 16
+python -m pip install -e ".[trace]"  # Also included in .[all] and .[dev]
 
-# Whole-image inference, when memory permits
-rastermoves upscale input.png -o output.png --tile 0
+# A single image: output.png.trace.json (a new numbered file if it already exists).
+rastermoves upscale input.png -o output.png --trace
 
-# CUDA half precision only for PyTorch models that explicitly support it
-rastermoves upscale input.png -o output.png --device cuda --precision fp16
+# One timeline for an entire model comparison, with per-model metrics in summary.json.
+rastermoves upscale input.png --all-models -o comparison --trace
+
+# Named trace; --trace-file enables recording even without --trace.
+rastermoves upscale input.png -o output.png --trace-file timings/run-01.json --trace-interval 0.1
 ```
 
-Tiles overlap and are feather-blended, with an additional context halo to reduce
-boundary artifacts. Sizes are in input-image pixels. Overlap must be smaller than
-the tile size. Spandrel's descriptor handles model-specific input padding and cropping;
-ONNX constraints can be supplied in a manifest. GPU out-of-memory failures during
-supported tiled inference trigger smaller-tile retries. Model loading failures and
-host RAM exhaustion do not receive that recovery.
+Traces contain wall time, process CPU time/utilization, resident/virtual memory and
+thread counts, plus system available-memory context. Timed stages distinguish model
+loading, downloads/cache verification, inference, postprocessing and output writing.
+Open the **Chrome JSON** trace in [Perfetto](https://ui.perfetto.dev/) to inspect the
+stage timeline alongside resource counters, or read the JSON directly. A concise
+run summary is printed to stderr. Batch/all-model defaults are `OUTPUT_DIR/trace.json`.
 
-Global-context models can behave differently on tiles. The tool respects a Spandrel
-model's discouraged/internal tiling guidance and runs a whole-image pass unless
-`--force-tiling` is supplied. That override may trade image consistency for lower VRAM.
-There is no promise that feathering eliminates every neural-model boundary artifact.
-
-Tiling limits inference VRAM, **not total output RAM**. Native-scale results are
-accumulated in host memory before final resizing. The default native AND final output
-limit is 64 megapixels; increase `--max-output-mp` only with sufficient memory. A
-3000x3000 input at 4x produces a 144-megapixel intermediate even when the final target
-is 3000 pixels wide, so it exceeds the default limit. The float RGB accumulation
-buffer plus weights alone uses about 16 bytes per native output pixel, before other
-arrays, inference workspaces and encoded output.
-
-Input PNG, JPEG, WebP, BMP and TIFF are supported via Pillow. Output supports PNG,
-lossless WebP, JPEG quality 95 and TIFF. The pipeline applies EXIF orientation and
-converts embedded profiles to sRGB. Alpha is handled separately using Lanczos by
-default; `--alpha model` sends the alpha channel through the model too. Transparent
-JPEG output is rejected rather than silently flattened. Input files are never
-replaced in place; overwriting an existing destination requires `--overwrite`.
-
-This version is an **8-bit still-image tool**. HDR/high-bit-depth input, animated
-images and multi-page inputs are rejected. EXIF metadata is intentionally not copied:
-orientation has been applied and stale dimensions/GPS fields are omitted. Neural
-upscaling can invent or alter detail; it is not forensic reconstruction.
+This is **process-level sampling**, not GPU profiling or exact allocation tracking:
+100% CPU means one logical CPU, multi-core use can exceed 100%, and memory peaks are
+sampled estimates that include runtime/allocator memory. Tracing is off by default;
+no sampler, trace files or psutil import are used until enabled. See the
+[tracing guide](docs/PROFILING.md) for fields, limitations, failure handling, resume and
+Python API usage.
 
 ## Python API
 
@@ -451,6 +440,18 @@ with Upscaler("4x-realesr-general-x4v3", device="auto") as upscaler:
 The same session can process many images without reloading the model. `upscale_image`
 accepts and returns a Pillow image. Sessions are not thread-safe; use separate sessions
 or external serialization. See `examples/batch_api.py` and [the plugin guide](docs/PLUGINS.md).
+
+## Part of DanceFlow
+
+**RasterMoves** is the image-upscaling and enhancement component of the DanceFlow
+family, alongside **KeywordMoves**, **StemLab**, **DanceMoves**, and **DanceRudiments**.
+It runs as a standalone Python library or command-line tool; it does not require those
+other components to be installed. The package, Python import, and executable all use
+`rastermoves`.
+
+Version 0.1.1 renamed the original UpscaleLab package. See the
+[migration guide](docs/MIGRATION.md) for import, command, plugin, environment-variable,
+and existing-cache changes, and the [changelog](CHANGELOG.md) for release details.
 
 ## Agent skill: use and improve RasterMoves
 
@@ -516,14 +517,6 @@ python -m build
 A GitHub Actions workflow is included for offline tests and an opt-in manual live
 smoke-test job. No repository was created and no release was published automatically.
 
-## Licence and references
-
-Project source: GPL-3.0-only. Model weights retain their own licences and are not
-included or relicensed. In particular, UltraSharpV2 and Remacri are recorded as
-non-commercial models. A model being downloadable does not grant commercial rights.
-Review the creator's terms separately. See `LICENSE`, `THIRD_PARTY_NOTICES.md`,
-[SECURITY.md](docs/SECURITY.md), and [SOURCES.md](docs/SOURCES.md).
-
 ## Automated releases and containers
 
 The [Release workflow](.github/workflows/release.yml) tests the tagged source, builds
@@ -550,3 +543,19 @@ After a successful production publication:
 python -m pip install "rastermoves[all]"
 docker run --rm ghcr.io/kieransimkin/rastermoves:0.2.0 --version
 ```
+
+## Agents and contributors
+
+Agents using RasterMoves should inspect its available capabilities, use them fully where they fit the task, and look for useful improvements wherever possible. When a required feature is missing, or a reusable reliability, usability, performance or documentation gap is found, improve this tool rather than maintaining a separate workaround. If no worthwhile change is justified, explain why.
+
+Submit every improvement as a pull request to [RasterMoves](https://github.com/kieransimkin/RasterMoves/pulls), with relevant tests, documentation and a reproducible example. Follow [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) for the contribution and validation workflow.
+
+Project website: [https://kieransimkin.co.uk/danceflow/](https://kieransimkin.co.uk/danceflow/).
+
+## Licence and references
+
+Project source: GPL-3.0-only. Model weights retain their own licences and are not
+included or relicensed. In particular, UltraSharpV2 and Remacri are recorded as
+non-commercial models. A model being downloadable does not grant commercial rights.
+Review the creator's terms separately. See `LICENSE`, `THIRD_PARTY_NOTICES.md`,
+[SECURITY.md](docs/SECURITY.md), and [SOURCES.md](docs/SOURCES.md).
