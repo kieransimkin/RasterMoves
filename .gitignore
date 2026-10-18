@@ -16,3 +16,6 @@ model-cache/
 *.part
 *.lock
 .env
+
+# Project-local model weights and caches
+models/
