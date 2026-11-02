@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.5 - 2026-11-02
+
+- Isolate Windows pytest process, fixture and cache paths in a probed unique LocalAppData run root with cleanup.
+- Normalize Git text to LF across platforms while retaining CRLF for Windows command scripts.
+
 ## 0.3.4 - 2026-10-08
 
 - Add explicit agent capability, improvement, validation and upstream PR guidance to the README and contributor instructions.
