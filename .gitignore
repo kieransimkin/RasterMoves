@@ -19,3 +19,7 @@ model-cache/
 
 # Project-local model weights and caches
 models/
+
+# Local test scratch is never source or release evidence.
+.pytest_cache/
+.test-tmp/
